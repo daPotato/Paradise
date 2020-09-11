@@ -44,7 +44,7 @@
 
 		strangling = null
 		update_icon()
-		processing_objects.Remove(src)
+		STOP_PROCESSING(SSobj, src)
 
 	else
 		..()
@@ -84,8 +84,7 @@
 	unwield(U)
 
 	U.swap_hand() // For whatever reason the grab will not properly work if we don't have the free hand active.
-	M.grabbedby(U, 1)
-	var/obj/item/grab/G = U.get_active_hand()
+	var/obj/item/grab/G = M.grabbedby(U, 1)
 	U.swap_hand()
 
 	if(G && istype(G))
@@ -98,14 +97,14 @@
 			M.AdjustSilence(1)
 
 	garrote_time = world.time + 10
-	processing_objects.Add(src)
+	START_PROCESSING(SSobj, src)
 	strangling = M
 	update_icon()
 
 	playsound(src.loc, 'sound/weapons/cablecuff.ogg', 15, 1, -1)
 
 	M.visible_message("<span class='danger'>[U] comes from behind and begins garroting [M] with the [src]!</span>", \
-				  "<span class='userdanger'>[U]\ begins garroting you with the [src]![improvised ? "" : " You are unable to speak!"]</span>", \
+				  "<span class='userdanger'>[U] begins garroting you with the [src]![improvised ? "" : " You are unable to speak!"]</span>", \
 				  "You hear struggling and wire strain against flesh!")
 
 	return
@@ -114,14 +113,14 @@
 	if(!strangling)
 		// Our mark got gibbed or similar
 		update_icon()
-		processing_objects.Remove(src)
+		STOP_PROCESSING(SSobj, src)
 		return
 
 
 	if(!istype(loc, /mob/living/carbon/human))
 		strangling = null
 		update_icon()
-		processing_objects.Remove(src)
+		STOP_PROCESSING(SSobj, src)
 		return
 
 	var/mob/living/carbon/human/user = loc
@@ -139,7 +138,7 @@
 
 		strangling = null
 		update_icon()
-		processing_objects.Remove(src)
+		STOP_PROCESSING(SSobj, src)
 
 		return
 
@@ -149,7 +148,7 @@
 
 		strangling = null
 		update_icon()
-		processing_objects.Remove(src)
+		STOP_PROCESSING(SSobj, src)
 
 		return
 
@@ -169,4 +168,4 @@
 /obj/item/twohanded/garrote/suicide_act(mob/user)
 	user.visible_message("<span class='suicide'>[user] is wrapping the [src] around [user.p_their()] neck and pulling the handles! It looks like [user.p_theyre()] trying to commit suicide.</span>")
 	playsound(src.loc, 'sound/weapons/cablecuff.ogg', 15, 1, -1)
-	return (OXYLOSS)
+	return OXYLOSS

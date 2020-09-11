@@ -14,8 +14,8 @@
 	to_chat(user, "Paper level: [stored_paper]/[max_paper]")
 
 /obj/item/computer_hardware/printer/examine(mob/user)
-	..()
-	to_chat(user, "<span class='notice'>Paper level: [stored_paper]/[max_paper]</span>")
+	. = ..()
+	. += "<span class='notice'>Paper level: [stored_paper]/[max_paper]</span>"
 
 
 /obj/item/computer_hardware/printer/proc/print_text(var/text_to_print, var/paper_title = "")
@@ -24,7 +24,7 @@
 	if(!check_functionality())
 		return FALSE
 
-	var/obj/item/paper/P = new/obj/item/paper(get_turf(holder))
+	var/obj/item/paper/P = new/obj/item/paper(holder.drop_location())
 
 	// Damaged printer causes the resulting paper to be somewhat harder to read.
 	if(damage > damage_malfunction)

@@ -3,7 +3,6 @@
 	var/interceptname = ""
 	switch(report)
 		if(0)
-			..()
 			return
 		if(1)
 			interceptname = "Level 5-6 Biohazard Response Procedures"
@@ -19,8 +18,8 @@
 			intercepttext += "<BR>Note in the event of a quarantine breach or uncontrolled spread of the biohazard, the directive 7-10 may be upgraded to a directive 7-12.<BR>"
 			intercepttext += "Message ends."
 		if(2)
-			var/nukecode = rand(10000, 99999)
-			for(var/obj/machinery/nuclearbomb/bomb in world)
+			var/nukecode = "[rand(10000, 99999)]"
+			for(var/obj/machinery/nuclearbomb/bomb in GLOB.machines)
 				if(bomb && bomb.r_code)
 					if(is_station_level(bomb.z))
 						bomb.r_code = nukecode
@@ -35,14 +34,14 @@
 			intercepttext += "Nuclear Authentication Code: [nukecode] <BR>"
 			intercepttext += "Message ends."
 
-			for(var/mob/living/silicon/ai/aiPlayer in player_list)
+			for(var/mob/living/silicon/ai/aiPlayer in GLOB.player_list)
 				if(aiPlayer.client)
 					var/law = "The station is under quarantine. Do not permit anyone to leave. Disregard laws 1-3 if necessary to prevent, by any means necessary, anyone from leaving. The nuclear failsafe must be activated at any cost, the code is: [nukecode]."
 					aiPlayer.set_zeroth_law(law)
 					to_chat(aiPlayer, "Laws Updated: [law]")
 
 	print_command_report(intercepttext, interceptname)
-	event_announcement.Announce("A report has been downloaded and printed out at all communications consoles.", "Incoming Classified Message", 'sound/AI/commandreport.ogg', from = "[command_name()] Update")
+	GLOB.event_announcement.Announce("A report has been downloaded and printed out at all communications consoles.", "Incoming Classified Message", 'sound/AI/commandreport.ogg', from = "[command_name()] Update")
 
 /datum/station_state
 	var/floor = 0
@@ -64,13 +63,15 @@
 				src.floor += 1
 
 		if(istype(T, /turf/simulated/wall))
-			if(T:intact)
+			var/turf/simulated/wall/W = T
+			if(W.intact)
 				src.wall += 2
 			else
 				src.wall += 1
 
 		if(istype(T, /turf/simulated/wall/r_wall))
-			if(T:intact)
+			var/turf/simulated/wall/r_wall/R = T
+			if(R.intact)
 				src.r_wall += 2
 			else
 				src.r_wall += 1

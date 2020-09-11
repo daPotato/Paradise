@@ -5,7 +5,7 @@
 	name = "omni device"
 	icon = 'icons/atmos/omni_devices.dmi'
 	icon_state = "base"
-	use_power = 1
+	use_power = IDLE_POWER_USE
 	initialize_directions = 0
 
 	can_unwrench = 1
@@ -31,7 +31,7 @@
 	icon_state = "base"
 
 	ports = new()
-	for(var/d in cardinal)
+	for(var/d in GLOB.cardinal)
 		var/datum/omni_port/new_port = new(src, d)
 		switch(d)
 			if(NORTH)
@@ -72,6 +72,8 @@
 	update_ports()
 
 /obj/machinery/atmospherics/omni/update_icon()
+	..()
+
 	if(stat & NOPOWER)
 		overlays = overlays_off
 		on = 0
@@ -82,8 +84,6 @@
 		overlays = on ? (overlays_on) : (overlays_off)
 
 	underlays = underlays_current
-
-	return
 
 /obj/machinery/atmospherics/omni/proc/error_check()
 	return

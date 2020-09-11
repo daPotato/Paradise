@@ -50,7 +50,8 @@
 				to_chat(H, "You already used this contract!")
 				return
 			used = 1
-			var/list/candidates = pollCandidates("Do you want to play as the wizard apprentice of [H.real_name]?", ROLE_WIZARD, 1)
+			var/image/source = image('icons/obj/cardboard_cutout.dmi', "cutout_wizard")
+			var/list/candidates = SSghost_spawns.poll_candidates("Do you want to play as the wizard apprentice of [H.real_name]?", ROLE_WIZARD, TRUE, source = source)
 			if(candidates.len)
 				var/mob/C = pick(candidates)
 				new /obj/effect/particle_effect/smoke(H.loc)
@@ -68,7 +69,7 @@
 						to_chat(M, "<B>Your service has not gone unrewarded, however. Studying under [H.real_name], you have learned reality bending mobility spells. You are able to cast teleport and ethereal jaunt.")
 					if("healing")
 						M.mind.AddSpell(new /obj/effect/proc_holder/spell/targeted/charge(null))
-						M.mind.AddSpell(new /obj/effect/proc_holder/spell/aoe_turf/conjure/forcewall(null))
+						M.mind.AddSpell(new /obj/effect/proc_holder/spell/targeted/forcewall(null))
 						M.equip_to_slot_or_del(new /obj/item/gun/magic/staff/healing(M), slot_r_hand)
 						to_chat(M, "<B>Your service has not gone unrewarded, however. Studying under [H.real_name], you have learned livesaving survival spells. You are able to cast charge and forcewall.")
 					if("robeless")
@@ -84,8 +85,8 @@
 				M.equip_to_slot_or_del(new /obj/item/storage/backpack(M), slot_back)
 				M.equip_to_slot_or_del(new /obj/item/storage/box(M), slot_in_backpack)
 				M.equip_to_slot_or_del(new /obj/item/teleportation_scroll/apprentice(M), slot_r_store)
-				var/wizard_name_first = pick(wizard_first)
-				var/wizard_name_second = pick(wizard_second)
+				var/wizard_name_first = pick(GLOB.wizard_first)
+				var/wizard_name_second = pick(GLOB.wizard_second)
 				var/randomname = "[wizard_name_first] [wizard_name_second]"
 				var/newname = sanitize(copytext(input(M, "You are the wizard's apprentice. Would you like to change your name to something else?", "Name change", randomname) as null|text,1,MAX_NAME_LEN))
 
@@ -99,9 +100,9 @@
 				new_objective:target = H:mind
 				new_objective.explanation_text = "Protect [H.real_name], the wizard."
 				M.mind.objectives += new_objective
-				ticker.mode.traitors += M.mind
+				SSticker.mode.apprentices += M.mind
 				M.mind.special_role = SPECIAL_ROLE_WIZARD_APPRENTICE
-				ticker.mode.update_wiz_icons_added(M.mind)
+				SSticker.mode.update_wiz_icons_added(M.mind)
 				M.faction = list("wizard")
 			else
 				used = 0
@@ -142,7 +143,6 @@
 	icon = 'icons/obj/biomass.dmi'
 	icon_state = "rift"
 	density = 1
-	unacidable = 1
 	anchored = 1.0
 	var/spawn_path = /mob/living/simple_animal/cow //defaulty cows to prevent unintentional narsies
 	var/spawn_amt_left = 20
@@ -153,8 +153,12 @@
 	src.spawn_amt_left = spawn_amt
 	src.desc = desc
 
-	processing_objects.Add(src)
+	START_PROCESSING(SSobj, src)
 	//return
+
+/obj/effect/rend/Destroy()
+	STOP_PROCESSING(SSobj, src)
+	return ..()
 
 /obj/effect/rend/process()
 	for(var/mob/M in loc)
@@ -169,7 +173,13 @@
 		user.visible_message("<span class='danger'>[user] seals \the [src] with \the [I].</span>")
 		qdel(src)
 		return
-	..()
+	return ..()
+
+/obj/effect/rend/singularity_pull()
+	return
+
+/obj/effect/rend/singularity_pull()
+	return
 
 /obj/item/veilrender/vealrender
 	name = "veal render"
@@ -217,7 +227,7 @@
 	user.ghostize(1)
 
 /////////////////////Multiverse Blade////////////////////
-var/global/list/multiverse = list()
+GLOBAL_LIST_EMPTY(multiverse)
 
 /obj/item/multisword
 	name = "multiverse sword"
@@ -243,11 +253,11 @@ var/global/list/multiverse = list()
 
 /obj/item/multisword/New()
 	..()
-	multiverse |= src
+	GLOB.multiverse |= src
 
 
 /obj/item/multisword/Destroy()
-	multiverse.Remove(src)
+	GLOB.multiverse.Remove(src)
 	return ..()
 
 /obj/item/multisword/attack(mob/living/M as mob, mob/living/user as mob)  //to prevent accidental friendly fire or out and out grief.
@@ -279,7 +289,7 @@ var/global/list/multiverse = list()
 					usr.mind.objectives += hijack_objective
 					hijack_objective.explanation_text = "Ensure only [usr.real_name] and [usr.p_their()] copies are on the shuttle!"
 					to_chat(usr, "<B>Objective #[1]</B>: [hijack_objective.explanation_text]")
-					ticker.mode.traitors += usr.mind
+					SSticker.mode.traitors += usr.mind
 					usr.mind.special_role = "[usr.real_name] Prime"
 					evil = TRUE
 				else
@@ -289,16 +299,17 @@ var/global/list/multiverse = list()
 					new_objective.explanation_text = "Survive, and help defend the innocent from the mobs of multiverse clones."
 					to_chat(usr, "<B>Objective #[1]</B>: [new_objective.explanation_text]")
 					usr.mind.objectives += new_objective
-					ticker.mode.traitors += usr.mind
+					SSticker.mode.traitors += usr.mind
 					usr.mind.special_role = "[usr.real_name] Prime"
 					evil = FALSE
 		else
 			cooldown = world.time + cooldown_between_uses
-			for(var/obj/item/multisword/M in multiverse)
+			for(var/obj/item/multisword/M in GLOB.multiverse)
 				if(M.assigned == assigned)
 					M.cooldown = cooldown
 
-			var/list/candidates = pollCandidates("Do you want to play as the wizard apprentice of [user.real_name]?", ROLE_WIZARD, 1, 100)
+			var/image/source = image('icons/obj/cardboard_cutout.dmi', "cutout_wizard")
+			var/list/candidates = SSghost_spawns.poll_candidates("Do you want to play as the wizard apprentice of [user.real_name]?", ROLE_WIZARD, TRUE, 10 SECONDS, source = source)
 			if(candidates.len)
 				var/mob/C = pick(candidates)
 				spawn_copy(C.client, get_turf(user.loc), user)
@@ -321,11 +332,11 @@ var/global/list/multiverse = list()
 	to_chat(M, "<B>You are an alternate version of [user.real_name] from another universe! Help [user.p_them()] accomplish [user.p_their()] goals at all costs.</B>")
 	M.faction = list("[user.real_name]")
 	if(duplicate_self)
-		M.set_species(user.get_species()) //duplicate the sword user's species.
+		M.set_species(user.dna.species.type) //duplicate the sword user's species.
 	else
 		if(prob(50))
-			var/list/all_species = list("Human","Unathi","Skrell","Tajaran","Kidan","Golem","Diona","Machine","Slime People","Grey","Vulpkanin")
-			M.set_species(pick(all_species))
+			var/list/list_all_species = list(/datum/species/human, /datum/species/unathi, /datum/species/skrell, /datum/species/tajaran, /datum/species/kidan, /datum/species/golem, /datum/species/diona, /datum/species/machine, /datum/species/slime, /datum/species/grey, /datum/species/vulpkanin)
+			M.set_species(pick(list_all_species))
 	M.real_name = user.real_name //this is clear down here in case the user happens to become a golem; that way they have the proper name.
 	M.name = user.real_name
 	if(duplicate_self)
@@ -429,7 +440,7 @@ var/global/list/multiverse = list()
 
 		M.equip_to_slot_or_del(sword, slot_r_hand) //Don't duplicate what's equipped to hands, or else duplicate swords could be generated...or weird cases of factionless swords.
 	else
-		if(M.get_species() == "Tajaran" || M.get_species() == "Unathi")
+		if(istajaran(M) || isunathi(M))
 			M.equip_to_slot_or_del(new /obj/item/clothing/shoes/sandal(M), slot_shoes)	//If they can't wear shoes, give them a pair of sandals.
 
 		var/randomize = pick("mobster","roman","wizard","cyborg","syndicate","assistant", "animu", "cultist", "highlander", "clown", "killer", "pirate", "soviet", "officer", "gladiator")
@@ -461,7 +472,7 @@ var/global/list/multiverse = list()
 				M.equip_to_slot_or_del(sword, slot_r_hand)
 
 			if("cyborg")
-				if(M.get_species() != "Machine")
+				if(!ismachineperson(M))
 					for(var/obj/item/organ/O in M.bodyparts)
 						O.robotize(make_tough = 1)
 				M.equip_to_slot_or_del(new /obj/item/clothing/glasses/thermal/eyepatch(M), slot_glasses)
@@ -573,10 +584,10 @@ var/global/list/multiverse = list()
 			W.access = duplicated_id.access
 			W.icon_state = duplicated_id.icon_state
 		else
-			W.access += access_maint_tunnels
+			W.access += ACCESS_MAINT_TUNNELS
 			W.icon_state = "centcom"
 	else
-		W.access += access_maint_tunnels
+		W.access += ACCESS_MAINT_TUNNELS
 		W.icon_state = "centcom"
 	W.assignment = "Multiverse Traveller"
 	W.registered_name = M.real_name
@@ -584,10 +595,10 @@ var/global/list/multiverse = list()
 	W.SetOwnerInfo(M)
 	M.equip_to_slot_or_del(W, slot_wear_id)
 
-	if(M.get_species() == "Vox")
-		M.species.after_equip_job(null, M) //Voxygen(tm)
-	if(M.get_species() == "Plasmaman")
-		M.species.after_equip_job(null, M) //No fireballs from other dimensions.
+	if(isvox(M))
+		M.dna.species.after_equip_job(null, M) //Nitrogen tanks
+	if(isplasmaman(M))
+		M.dna.species.after_equip_job(null, M) //No fireballs from other dimensions.
 
 	M.update_icons()
 
@@ -634,8 +645,8 @@ var/global/list/multiverse = list()
 		to_chat(user, "<span class='warning'>This artifact can only affect the dead!</span>")
 		return
 
-	if(!M.mind || !M.client)
-		to_chat(user, "<span class='warning'>There is no soul connected to this body...</span>")
+	if((!M.mind || !M.client) && !M.grab_ghost())
+		to_chat(user,"<span class='warning'>There is no soul connected to this body...</span>")
 		return
 
 	check_spooky()//clean out/refresh the list
@@ -646,8 +657,9 @@ var/global/list/multiverse = list()
 	if(heresy)
 		spawnheresy(M)//oh god why
 	else
-		M.set_species("Skeleton")
+		M.set_species(/datum/species/skeleton)
 		M.visible_message("<span class = 'warning'> A massive amount of flesh sloughs off [M] and a skeleton rises up!</span>")
+		M.grab_ghost() // yoinks the ghost if its not in the body
 		M.revive()
 		equip_skeleton(M)
 	spooky_scaries |= M
@@ -713,7 +725,7 @@ var/global/list/multiverse = list()
 			H.equip_to_slot_or_del(new /obj/item/twohanded/spear(H), slot_back)
 
 /obj/item/necromantic_stone/proc/spawnheresy(mob/living/carbon/human/H as mob)
-	H.set_species("Human")
+	H.set_species(/datum/species/human)
 	if(H.gender == MALE)
 		H.change_gender(FEMALE)
 
@@ -728,9 +740,8 @@ var/global/list/multiverse = list()
 
 	H.update_dna()
 	H.update_body()
-
+	H.grab_ghost()
 	H.revive()
-
 	H.equip_to_slot_or_del(new /obj/item/clothing/shoes/sandal(H), slot_shoes)
 	H.equip_to_slot_or_del(new /obj/item/clothing/head/kitty(H), slot_head)
 	H.equip_to_slot_or_del(new /obj/item/clothing/under/schoolgirl(H), slot_w_uniform)
@@ -769,8 +780,8 @@ var/global/list/multiverse = list()
 	var/obj/item/link = null
 	var/cooldown_time = 30 //3s
 	var/cooldown = 0
-	burntime = 0
-	burn_state = FLAMMABLE
+	max_integrity = 10
+	resistance_flags = FLAMMABLE
 
 /obj/item/voodoo/attackby(obj/item/I as obj, mob/user as mob, params)
 	if(target && cooldown < world.time)
@@ -779,13 +790,13 @@ var/global/list/multiverse = list()
 			target.bodytemperature += 50
 			GiveHint(target)
 		else if(is_pointed(I))
-			to_chat(target, "<span class='userdanger'>You feel a stabbing pain in [parse_zone(user.zone_sel.selecting)]!</span>")
+			to_chat(target, "<span class='userdanger'>You feel a stabbing pain in [parse_zone(user.zone_selected)]!</span>")
 			target.Weaken(2)
 			GiveHint(target)
 		else if(istype(I,/obj/item/bikehorn))
 			to_chat(target, "<span class='userdanger'>HONK</span>")
-			target << 'sound/items/AirHorn.ogg'
-			target.AdjustEarDeaf(3)
+			target << 'sound/items/airhorn.ogg'
+			target.MinimumDeafTicks(3)
 			GiveHint(target)
 		cooldown = world.time +cooldown_time
 		return
@@ -797,9 +808,10 @@ var/global/list/multiverse = list()
 			link = I
 			to_chat(user, "You attach [I] to the doll.")
 			update_targets()
-	..()
+		return
+	return ..()
 
-/obj/item/voodoo/check_eye(mob/user as mob)
+/obj/item/voodoo/check_eye(mob/user)
 	if(loc != user)
 		user.reset_perspective(null)
 		user.unset_machine()
@@ -809,7 +821,7 @@ var/global/list/multiverse = list()
 		target = input(user, "Select your victim!", "Voodoo") as null|anything in possible
 		return
 
-	if(user.zone_sel.selecting == "chest")
+	if(user.zone_selected == "chest")
 		if(link)
 			target = null
 			link.loc = get_turf(src)
@@ -819,7 +831,7 @@ var/global/list/multiverse = list()
 			return
 
 	if(target && cooldown < world.time)
-		switch(user.zone_sel.selecting)
+		switch(user.zone_selected)
 			if("mouth")
 				var/wgw =  sanitize(input(user, "What would you like the victim to say", "Voodoo", null)  as text)
 				target.say(wgw)
@@ -832,7 +844,7 @@ var/global/list/multiverse = list()
 					user.unset_machine()
 			if("r_leg","l_leg")
 				to_chat(user, "<span class='notice'>You move the doll's legs around.</span>")
-				var/turf/T = get_step(target,pick(cardinal))
+				var/turf/T = get_step(target,pick(GLOB.cardinal))
 				target.Move(T)
 			if("r_arm","l_arm")
 				//use active hand on random nearby mob
@@ -856,8 +868,9 @@ var/global/list/multiverse = list()
 	possible = list()
 	if(!link)
 		return
-	for(var/mob/living/carbon/human/H in living_mob_list)
-		if(md5(H.dna.uni_identity) in link.fingerprints)
+	for(var/thing in GLOB.human_list)
+		var/mob/living/carbon/human/H = thing
+		if(H.stat != DEAD && (md5(H.dna.uni_identity) in link.fingerprints))
 			possible |= H
 
 /obj/item/voodoo/proc/GiveHint(mob/victim,force=0)
@@ -868,7 +881,7 @@ var/global/list/multiverse = list()
 		var/area/A = get_area(src)
 		to_chat(victim, "<span class='notice'>You feel a dark presence from [A.name]</span>")
 
-/obj/item/voodoo/fire_act()
+/obj/item/voodoo/fire_act(datum/gas_mixture/air, exposed_temperature, exposed_volume, global_overlay = TRUE)
 	if(target)
 		target.adjust_fire_stacks(20)
 		target.IgniteMob()

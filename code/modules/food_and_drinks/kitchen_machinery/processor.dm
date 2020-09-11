@@ -9,7 +9,7 @@
 	var/broken = 0
 	var/processing = 0
 
-	use_power = 1
+	use_power = IDLE_POWER_USE
 	idle_power_usage = 5
 	active_power_usage = 50
 	var/rating_speed = 1
@@ -30,13 +30,10 @@
 		rating_speed = M.rating
 
 /obj/machinery/processor/process()
-	..()
-	// The irony
-	// To be clear, if it's grinding, then it can't suck them up
 	if(processing)
 		return
-	var/mob/living/carbon/slime/picked_slime
-	for(var/mob/living/carbon/slime/slime in range(1, src))
+	var/mob/living/simple_animal/slime/picked_slime
+	for(var/mob/living/simple_animal/slime/slime in range(1, src))
 		if(slime.loc == src)
 			continue
 		if(slime.stat)
@@ -48,7 +45,7 @@
 	if(!P)
 		return
 
-	visible_message("[picked_slime] is sucked into \the [src].")
+	visible_message("<span class='notice'>[picked_slime] is sucked into [src].</span>")
 	picked_slime.forceMove(src)
 
 //RECIPE DATUMS
@@ -87,6 +84,10 @@
 	input = /obj/item/reagent_containers/food/snacks/doughslice
 	output = /obj/item/reagent_containers/food/snacks/spaghetti
 
+/datum/food_processor_process/macaroni
+	input = /obj/item/reagent_containers/food/snacks/spaghetti
+	output = /obj/item/reagent_containers/food/snacks/macaroni
+
 /datum/food_processor_process/parsnip
 	input = /obj/item/reagent_containers/food/snacks/grown/parsnip
 	output = /obj/item/reagent_containers/food/snacks/roastparsnip
@@ -106,18 +107,18 @@
 /////MOB RECIPIES/////
 //////////////////////
 /datum/food_processor_process/mob/slime
-	input = /mob/living/carbon/slime
+	input = /mob/living/simple_animal/slime
 	output = null
 
 /datum/food_processor_process/mob/slime/process_food(loc, what, obj/machinery/processor/processor)
-	var/mob/living/carbon/slime/S = what
+	var/mob/living/simple_animal/slime/S = what
 	var/C = S.cores
 	if(S.stat != DEAD)
-		S.loc = loc
+		S.forceMove(processor.drop_location())
 		S.visible_message("<span class='notice'>[S] crawls free of the processor!</span>")
 		return
 	for(var/i in 1 to (C+processor.rating_amount-1))
-		new S.coretype(loc)
+		new S.coretype(processor.drop_location())
 		feedback_add_details("slime_core_harvested","[replacetext(S.colour," ","_")]")
 	..()
 
@@ -174,7 +175,7 @@
 	if(default_unfasten_wrench(user, O))
 		return
 
- 	default_deconstruction_crowbar(O)
+	default_deconstruction_crowbar(user, O)
 
 	var/obj/item/what = O
 

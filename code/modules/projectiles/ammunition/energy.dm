@@ -5,14 +5,14 @@
 	projectile_type = /obj/item/projectile/energy
 	var/e_cost = 100 //The amount of energy a cell needs to expend to create this shot.
 	var/select_name = "energy"
-	fire_sound = 'sound/weapons/Laser.ogg'
+	fire_sound = 'sound/weapons/laser.ogg'
 
 /obj/item/ammo_casing/energy/laser
 	projectile_type = /obj/item/projectile/beam/laser
 	select_name = "kill"
 
 /obj/item/ammo_casing/energy/laser/cyborg //to balance cyborg energy cost seperately
-    e_cost = 250
+	e_cost = 250
 
 /obj/item/ammo_casing/energy/lasergun
 	projectile_type = /obj/item/projectile/beam/laser
@@ -25,6 +25,7 @@
 /obj/item/ammo_casing/energy/laser/practice
 	projectile_type = /obj/item/projectile/beam/practice
 	select_name = "practice"
+	harmful = FALSE
 
 /obj/item/ammo_casing/energy/laser/scatter
 	projectile_type = /obj/item/projectile/beam/scatter
@@ -52,14 +53,16 @@
 /obj/item/ammo_casing/energy/laser/bluetag
 	projectile_type = /obj/item/projectile/beam/lasertag/bluetag
 	select_name = "bluetag"
+	harmful = FALSE
 
 /obj/item/ammo_casing/energy/laser/redtag
 	projectile_type = /obj/item/projectile/beam/lasertag/redtag
 	select_name = "redtag"
+	harmful = FALSE
 
 /obj/item/ammo_casing/energy/xray
 	projectile_type = /obj/item/projectile/beam/xray
-	e_cost = 50
+	e_cost = 100
 	fire_sound = 'sound/weapons/laser3.ogg'
 
 /obj/item/ammo_casing/energy/immolator
@@ -67,15 +70,36 @@
 	fire_sound = 'sound/weapons/laser3.ogg'
 	e_cost = 125
 
+/obj/item/ammo_casing/energy/immolator/strong
+	projectile_type = /obj/item/projectile/beam/immolator/strong
+	e_cost = 125
+	select_name = "precise"
+
+/obj/item/ammo_casing/energy/immolator/strong/cyborg
+	// Used by gamma ERT borgs
+	e_cost = 1000 // 5x that of the standard laser, for 2.25x the damage (if 1/1 shots hit) plus ignite. Not energy-efficient, but can be used for sniping.
+
+/obj/item/ammo_casing/energy/immolator/scatter
+	projectile_type = /obj/item/projectile/beam/immolator/weak
+	e_cost = 125
+	pellets = 6
+	variance = 25
+	select_name = "scatter"
+
+/obj/item/ammo_casing/energy/immolator/scatter/cyborg
+	// Used by gamma ERT borgs
+	e_cost = 1000 // 5x that of the standard laser, for 7.5x the damage (if 6/6 shots hit) plus ignite. Efficient only if you hit with at least 4/6 of the shots.
+
 /obj/item/ammo_casing/energy/electrode
 	projectile_type = /obj/item/projectile/energy/electrode
 	select_name = "stun"
 	fire_sound = 'sound/weapons/taser.ogg'
 	e_cost = 200
 	delay = 15
+	harmful = FALSE
 
 /obj/item/ammo_casing/energy/electrode/gun
-	fire_sound = 'sound/weapons/gunshot.ogg'
+	fire_sound = 'sound/weapons/gunshots/gunshot.ogg'
 	e_cost = 100
 
 /obj/item/ammo_casing/energy/electrode/hos //allows balancing of HoS and blueshit guns seperately from other energy weapons
@@ -84,7 +108,7 @@
 /obj/item/ammo_casing/energy/ion
 	projectile_type = /obj/item/projectile/ion
 	select_name = "ion"
-	fire_sound = 'sound/weapons/IonRifle.ogg'
+	fire_sound = 'sound/weapons/ionrifle.ogg'
 
 /obj/item/ammo_casing/energy/declone
 	projectile_type = /obj/item/projectile/energy/declone
@@ -94,10 +118,11 @@
 /obj/item/ammo_casing/energy/mindflayer
 	projectile_type = /obj/item/projectile/beam/mindflayer
 	select_name = "MINDFUCK"
-	fire_sound = 'sound/weapons/Laser.ogg'
+	fire_sound = 'sound/weapons/laser.ogg'
 
 /obj/item/ammo_casing/energy/flora
 	fire_sound = 'sound/effects/stealthoff.ogg'
+	harmful = FALSE
 
 /obj/item/ammo_casing/energy/flora/yield
 	projectile_type = /obj/item/projectile/energy/florayield
@@ -128,6 +153,7 @@
 	select_name  = "disable"
 	e_cost = 50
 	fire_sound = 'sound/weapons/taser2.ogg'
+	harmful = FALSE
 
 /obj/item/ammo_casing/energy/disabler/cyborg //seperate balancing for cyborg, again
 	e_cost = 250
@@ -150,6 +176,7 @@
 	fire_sound = 'sound/weapons/pulse3.ogg'
 	var/obj/item/gun/energy/wormhole_projector/gun = null
 	select_name = "blue"
+	harmful = FALSE
 
 /obj/item/ammo_casing/energy/wormhole/New(var/obj/item/gun/energy/wormhole_projector/wh)
 	gun = wh
@@ -162,7 +189,7 @@
 	projectile_type = /obj/item/projectile/energy/bolt
 	select_name = "bolt"
 	e_cost = 500
-	fire_sound = 'sound/weapons/Genhit.ogg'
+	fire_sound = 'sound/weapons/genhit.ogg'
 
 /obj/item/ammo_casing/energy/bolt/large
 	projectile_type = /obj/item/projectile/energy/bolt/large
@@ -170,7 +197,7 @@
 
 /obj/item/ammo_casing/energy/dart
 	projectile_type = /obj/item/projectile/energy/dart
-	fire_sound = 'sound/weapons/Genhit.ogg'
+	fire_sound = 'sound/weapons/genhit.ogg'
 	e_cost = 500
 	select_name = "toxic dart"
 
@@ -206,7 +233,7 @@
 
 /obj/item/ammo_casing/energy/clown
 	projectile_type = /obj/item/projectile/clown
-	fire_sound = 'sound/weapons/Gunshot_smg.ogg'
+	fire_sound = 'sound/weapons/gunshots/gunshot_smg.ogg'
 	select_name = "clown"
 
 /obj/item/ammo_casing/energy/sniper

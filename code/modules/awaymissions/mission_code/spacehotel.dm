@@ -2,7 +2,8 @@
 
 /area/awaymission/spacehotel
 	name = "Deep Space Hotel 419"
-	requires_power = 0
+	requires_power = FALSE
+	dynamic_lighting = DYNAMIC_LIGHTING_FORCED
 
 /area/awaymission/spacehotel/kitchen
 	name = "Hotel Kitchen"
@@ -89,12 +90,12 @@
 // The door to a hotel room, but also metadata for the room itself
 /obj/machinery/door/unpowered/hotel_door
 	name = "Room Door"
-	icon = 'icons/obj/doors/Doorsand.dmi'
+	icon = 'icons/obj/doors/doorsand.dmi'
 	icon_state = "door_closed"
 	autoclose = 1
 	var/doorOpen = 'sound/machines/airlock_open.ogg'
 	var/doorClose = 'sound/machines/airlock_close.ogg'
-	var/doorDeni = 'sound/machines/DeniedBeep.ogg'
+	var/doorDeni = 'sound/machines/deniedbeep.ogg'
 	var/id									// the room number, eg 101
 	var/obj/item/card/hotel_card/card// room's key card
 	var/mob/living/occupant = null			// the current room occupant
@@ -120,8 +121,8 @@
 	return ..()
 
 /obj/machinery/door/unpowered/hotel_door/examine(mob/user)
-	..()
-	to_chat(user, "This room is currently [occupant ? "" : "un"]occupied.")
+	. = ..()
+	. += "This room is currently [occupant ? "" : "un"]occupied."
 
 /obj/machinery/door/unpowered/hotel_door/allowed(mob/living/carbon/user)
 	for(var/obj/item/card/hotel_card/C in user.get_all_slots())
@@ -152,14 +153,6 @@
 /obj/machinery/door/unpowered/hotel_door/autoclose()
 	if(!density && !operating && autoclose)
 		close()
-
-/obj/machinery/door/unpowered/hotel_door/emag_act(mob/user)
-	if(isliving(user) && density)
-		var/obj/effect/hotel_controller/H
-		if(H.controller)
-			H.controller.deploy_sec(user)
-	..()
-
 /obj/item/card/hotel_card
 	name = "Key Card"
 	icon_state = "guest"
@@ -234,7 +227,7 @@
 	D.account = get_card_account(id, occupant)
 	if(!D.account)
 		return null
-	if(!D.account.charge(100, transaction_purpose = "10 minutes", dest_name = name))
+	if(!D.account.charge(100, null, "10 minutes hotel stay", "Biesel GalaxyNet Terminal [rand(111,1111)]", "[name]"))
 		return null
 
 	D.occupant = occupant
@@ -251,7 +244,7 @@
 	if(!D || !D.occupant)
 		return
 
-	if(D.account.charge(100, transaction_purpose = "10 minutes", dest_name = name))
+	if(D.account.charge(100, null, "10 minutes hotel stay extension", "Biesel GalaxyNet Terminal [rand(111,1111)]", "[name]"))
 		D.roomtimer = addtimer(CALLBACK(src, .proc/process_room, roomid), PAY_INTERVAL, TIMER_STOPPABLE)
 	else
 		force_checkout(roomid)
@@ -279,24 +272,8 @@
 
 	var/mob/deadbeat = D.occupant
 
-	radio.autosay("[deadbeat], your card has been rejected. You have 30 seconds to check out.", name, zlevel = list(z))
+	radio.autosay("[deadbeat], your card has been rejected. You have 30 seconds to check out.", name)
 	spawn(300)
 		if(D.occupant == deadbeat)
 			// they still haven't checked out...
-			deploy_sec(deadbeat)
 			checkout(roomid)
-
-/obj/effect/hotel_controller/proc/deploy_sec(mob/living/target)
-	if(!istype(target) || !istype(get_area(target), /area/awaymission/spacehotel))
-		return
-
-	var/list/secs[0]
-	for(var/mob/living/carbon/human/interactive/away/hotel/guard/M in get_area(src))
-		if(!M.retal)
-			secs += M
-	var/mob/living/carbon/human/interactive/away/hotel/guard/S = safepick(secs)
-	if(!S)
-		return
-
-	S.retal_target = target
-	S.retal = 1

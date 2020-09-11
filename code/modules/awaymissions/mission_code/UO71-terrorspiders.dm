@@ -1,44 +1,44 @@
 /area/awaymission/UO71
 	name = "UO71"
 	icon_state = "away"
-	report_alerts = 0
-	tele_proof = 1
+	report_alerts = FALSE
+	tele_proof = TRUE
 
 
 /area/awaymission/UO71/plaza
 	name = "UO71 Plaza"
 	icon_state = "awaycontent1"
-	fire = 1
+	fire = TRUE
 
 /area/awaymission/UO71/centralhall
 	name = "UO71 Central"
 	icon_state = "awaycontent2"
-	fire = 1
+	fire = TRUE
 
 /area/awaymission/UO71/eng
 	name = "UO71 Engineering"
 	icon_state = "awaycontent3"
-	fire = 1
+	fire = TRUE
 
 /area/awaymission/UO71/mining
 	name = "UO71 Mining"
 	icon_state = "awaycontent4"
-	fire = 1
+	fire = TRUE
 
 /area/awaymission/UO71/science
 	name = "UO71 Science"
 	icon_state = "awaycontent5"
-	fire = 1
+	fire = TRUE
 
 /area/awaymission/UO71/medical
 	name = "UO71 Medical"
 	icon_state = "awaycontent6"
-	fire = 1
+	fire = TRUE
 
 /area/awaymission/UO71/gateway
 	name = "UO71 Gateway"
 	icon_state = "awaycontent7"
-	fire = 1
+	fire = TRUE
 
 /area/awaymission/UO71/outside
 	name = "UO71 Outside"
@@ -47,36 +47,41 @@
 /area/awaymission/UO71/bridge
 	name = "UO71 Bridge"
 	icon_state = "awaycontent21"
-	fire = 1
-	requires_power = 0
-	tele_proof = 1
+	fire = TRUE
+	requires_power = FALSE
+	tele_proof = TRUE
+	dynamic_lighting = DYNAMIC_LIGHTING_FORCED
 
 /area/awaymission/UO71/queen
 	name = "UO71 Queen Lair"
 	icon_state = "awaycontent9"
-	fire = 1
-	requires_power = 0
-	tele_proof = 1
+	fire = TRUE
+	requires_power = FALSE
+	tele_proof = TRUE
+	dynamic_lighting = DYNAMIC_LIGHTING_FORCED
 
 /area/awaymission/UO71/prince
 	name = "UO71 Prince Containment"
 	icon_state = "awaycontent10"
-	fire = 1
-	requires_power = 0
-	tele_proof = 1
+	fire = TRUE
+	requires_power = FALSE
+	tele_proof = TRUE
+	dynamic_lighting = DYNAMIC_LIGHTING_FORCED
 
 /area/awaymission/UO71/mother
 	name = "UO71 Mother Containment"
 	icon_state = "awaycontent10"
-	fire = 1
-	requires_power = 0
-	tele_proof = 1
+	fire = TRUE
+	requires_power = FALSE
+	tele_proof = TRUE
+	dynamic_lighting = DYNAMIC_LIGHTING_FORCED
 
 /area/awaymission/UO71/loot
 	name = "UO71 Loot Vault"
 	icon_state = "awaycontent11"
-	requires_power = 0
-	tele_proof = 1
+	requires_power = FALSE
+	tele_proof = TRUE
+	dynamic_lighting = DYNAMIC_LIGHTING_FORCED
 
 /obj/item/paper/terrorspiders1
 	name = "paper - 'Sealed Facility'"
@@ -179,11 +184,6 @@
 	(the writing trails off, as if the writer was interrupted)<br>
 	"}
 
-/obj/item/paper/terrorspiders9
-	name = "paper - 'Research Notes'"
-	info = "<b>The notes appear gibberish to you. Perhaps a destructive analyser in R&D could make sense of them.</b>"
-	origin_tech = "combat=4;materials=4;engineering=4;biotech=4"
-
 /obj/item/gun/energy/laser/awaymission_aeg
 	name = "Wireless Energy Gun"
 	desc = "An energy gun that recharges wirelessly during away missions. Does not work on the main station."
@@ -191,25 +191,26 @@
 	origin_tech = null
 	selfcharge = 1
 	can_charge = 0
-	var/inawaymission = 1
+	// Selfcharge is enabled and disabled, and used as the away mission tracker
+	selfcharge = TRUE
 
-/obj/item/gun/energy/laser/awaymission_aeg/process()
-	var/turf/my_loc = get_turf(src)
-	if(is_away_level(my_loc.z))
-		if(inawaymission)
-			return ..()
+/obj/item/gun/energy/laser/awaymission_aeg/Initialize(mapload)
+	. = ..()
+	// Force update it incase it spawns outside an away mission and shouldnt be charged
+	onTransitZ(new_z = loc.z)
+
+/obj/item/gun/energy/laser/awaymission_aeg/onTransitZ(old_z, new_z)
+	if(is_away_level(new_z))
 		if(ismob(loc))
 			to_chat(loc, "<span class='notice'>Your [src] activates, starting to draw power from a nearby wireless power source.</span>")
-		inawaymission = 1
+		selfcharge = TRUE
 	else
-		if(inawaymission)
+		if(selfcharge)
 			if(ismob(loc))
 				to_chat(loc, "<span class='danger'>Your [src] deactivates, as it is out of range from its power source.</span>")
-			power_supply.charge = 0
-			inawaymission = 0
+			cell.charge = 0
+			selfcharge = FALSE
 			update_icon()
-
-
 
 /obj/item/reagent_containers/glass/beaker/terror_black_toxin
 	name = "beaker 'Black Terror Venom'"
@@ -224,7 +225,7 @@
 	name = "ID Upgrade Machine"
 	icon_state = "guest"
 	icon_screen = "pass"
-	var/list/access_to_give = list(access_away01)
+	var/list/access_to_give = list(ACCESS_AWAY01)
 	var/beenused = 0
 	var/door_to_open = "UO71_Start"
 
@@ -248,7 +249,7 @@
 			spawn(1)
 				beenused = 1
 				var/unlocked_something = 0
-				for(var/obj/machinery/door/poddoor/P in airlocks)
+				for(var/obj/machinery/door/poddoor/P in GLOB.airlocks)
 					if(P.density && P.id_tag == door_to_open && P.z == z)
 						P.open()
 						unlocked_something = 1
@@ -256,6 +257,5 @@
 					to_chat(user, "<span class='danger'>Activating the machine has unlocked a way forward!</span>")
 		else
 			to_chat(user, "<span class='notice'>Your ID card already has all the access this machine can give.</span>")
-		. = 1
-
-
+		return
+	return ..()

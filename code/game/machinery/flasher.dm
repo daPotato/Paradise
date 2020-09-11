@@ -5,6 +5,9 @@
 	desc = "A wall-mounted flashbulb device."
 	icon = 'icons/obj/stationobjs.dmi'
 	icon_state = "mflash1"
+	max_integrity = 250
+	integrity_failure = 100
+	damage_deflection = 10
 	var/id = null
 	var/range = 2 //this is roughly the size of brig cell
 	var/disable = 0
@@ -37,16 +40,6 @@
 		icon_state = "[base_state]1-p"
 //		sd_set_light(0)
 
-//Don't want to render prison breaks impossible
-/obj/machinery/flasher/attackby(obj/item/W as obj, mob/user as mob, params)
-	if(istype(W, /obj/item/wirecutters))
-		add_fingerprint(user)
-		disable = !disable
-		if(disable)
-			user.visible_message("<span class='warning'>[user] has disconnected the [src]'s flashbulb!</span>", "<span class='warning'>You disconnect the [src]'s flashbulb!</span>")
-		if(!disable)
-			user.visible_message("<span class='warning'>[user] has connected the [src]'s flashbulb!</span>", "<span class='warning'>You connect the [src]'s flashbulb!</span>")
-
 //Let the AI trigger them directly.
 /obj/machinery/flasher/attack_ai(mob/user)
 	if(anchored)
@@ -65,6 +58,8 @@
 
 	playsound(loc, 'sound/weapons/flash.ogg', 100, 1)
 	flick("[base_state]_flash", src)
+	set_light(2, 1, COLOR_WHITE)
+	addtimer(CALLBACK(src, /atom./proc/set_light, 0), 2)
 	last_flash = world.time
 	use_power(1000)
 
@@ -95,18 +90,28 @@
 		if((M.m_intent != MOVE_INTENT_WALK) && (anchored))
 			flash()
 
-/obj/machinery/flasher/portable/attackby(obj/item/W as obj, mob/user as mob, params)
-	if(istype(W, /obj/item/wrench))
-		add_fingerprint(user)
-		anchored = !anchored
+//Don't want to render prison breaks impossible
+/obj/machinery/flasher/portable/wirecutter_act(mob/user, obj/item/I)
+	. = TRUE
+	if(!I.use_tool(src, user, 0, volume = I.tool_volume))
+		return
+	disable = !disable
+	if(disable)
+		user.visible_message("<span class='warning'>[user] has disconnected [src]'s flashbulb!</span>", "<span class='warning'>You disconnect [src]'s flashbulb!</span>")
+	if(!disable)
+		user.visible_message("<span class='warning'>[user] has connected [src]'s flashbulb!</span>", "<span class='warning'>You connect [src]'s flashbulb!</span>")
 
-		if(!anchored)
-			user.show_message(text("<span class='warning'>[src] can now be moved.</span>"))
-			overlays.Cut()
-
-		else if(anchored)
-			user.show_message(text("<span class='warning'>[src] is now secured.</span>"))
-			overlays += "[base_state]-s"
+/obj/machinery/flasher/portable/wrench_act(mob/user, obj/item/I)
+	. = TRUE
+	if(!I.use_tool(src, user, 0, volume = I.tool_volume))
+		return
+	anchored = !anchored
+	if(anchored)
+		WRENCH_ANCHOR_MESSAGE
+		overlays.Cut()
+	else if(anchored)
+		WRENCH_UNANCHOR_MESSAGE
+		overlays += "[base_state]-s"
 
 // Flasher button
 /obj/machinery/flasher_button
@@ -117,7 +122,7 @@
 	var/id = null
 	var/active = 0
 	anchored = 1.0
-	use_power = 1
+	use_power = IDLE_POWER_USE
 	idle_power_usage = 2
 	active_power_usage = 4
 
@@ -127,9 +132,6 @@
 /obj/machinery/flasher_button/attack_ghost(mob/user)
 	if(user.can_advanced_admin_interact())
 		return attack_hand(user)
-
-/obj/machinery/flasher_button/attackby(obj/item/W, mob/user as mob, params)
-	return attack_hand(user)
 
 /obj/machinery/flasher_button/attack_hand(mob/user as mob)
 	if(stat & (NOPOWER|BROKEN))
@@ -142,7 +144,7 @@
 	active = 1
 	icon_state = "launcheract"
 
-	for(var/obj/machinery/flasher/M in world)
+	for(var/obj/machinery/flasher/M in GLOB.machines)
 		if(M.id == id)
 			spawn()
 				M.flash()

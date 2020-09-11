@@ -9,31 +9,30 @@
 /area/awaymission/wwmines
 	name = "\improper Wild West Mines"
 	icon_state = "away1"
-	luminosity = 1
-	requires_power = 0
+	requires_power = FALSE
+	dynamic_lighting = DYNAMIC_LIGHTING_FORCED
 
 /area/awaymission/wwgov
 	name = "\improper Wild West Mansion"
 	icon_state = "away2"
-	luminosity = 1
-	requires_power = 0
+	requires_power = FALSE
+	dynamic_lighting = DYNAMIC_LIGHTING_FORCED
 
 /area/awaymission/wwrefine
 	name = "\improper Wild West Refinery"
 	icon_state = "away3"
-	luminosity = 1
-	requires_power = 0
+	requires_power = FALSE
+	dynamic_lighting = DYNAMIC_LIGHTING_FORCED
 
 /area/awaymission/wwvault
 	name = "\improper Wild West Vault"
 	icon_state = "away3"
-	luminosity = 0
 
 /area/awaymission/wwvaultdoors
 	name = "\improper Wild West Vault Doors"  // this is to keep the vault area being entirely lit because of requires_power
 	icon_state = "away2"
-	requires_power = 0
-	luminosity = 0
+	requires_power = FALSE
+	dynamic_lighting = DYNAMIC_LIGHTING_FORCED
 
 /*
  * Wish Granter
@@ -46,7 +45,7 @@
 
 	anchored = 1
 	density = 1
-	use_power = 0
+	use_power = NO_POWER_USE
 
 	var/chargesa = 1
 	var/insistinga = 0
@@ -72,7 +71,7 @@
 	else
 		chargesa--
 		insistinga = 0
-		var/wish = input("You want...","Wish") as null|anything in list("Power","Wealth","Immortality","To Kill","Peace")
+		var/wish = input("You want...","Wish") as null|anything in list("Power","Wealth","Immortality","Peace")
 		switch(wish)
 			if("Power")
 				to_chat(user, "<B>Your wish is granted, but at a terrible cost...</B>")
@@ -82,12 +81,12 @@
 				user.mutations.Add(XRAY)
 				if(ishuman(user))
 					var/mob/living/carbon/human/human = user
-					if(human.species.name != "Shadow")
+					if(!isshadowperson(human))
 						to_chat(user, "<span class='warning'>Your flesh rapidly mutates!</span>")
 						to_chat(user, "<b>You are now a Shadow Person, a mutant race of darkness-dwelling humanoids.</b>")
 						to_chat(user, "<span class='warning'>Your body reacts violently to light.</span> <span class='notice'>However, it naturally heals in darkness.</span>")
 						to_chat(user, "Aside from your new traits, you are mentally unchanged and retain your prior obligations.")
-						human.set_species("Shadow")
+						human.set_species(/datum/species/shadow)
 				user.regenerate_icons()
 			if("Wealth")
 				to_chat(user, "<B>Your wish is granted, but at a terrible cost...</B>")
@@ -95,12 +94,12 @@
 				new /obj/structure/closet/syndicate/resources/everything(loc)
 				if(ishuman(user))
 					var/mob/living/carbon/human/human = user
-					if(human.species.name != "Shadow")
+					if(!isshadowperson(human))
 						to_chat(user, "<span class='warning'>Your flesh rapidly mutates!</span>")
 						to_chat(user, "<b>You are now a Shadow Person, a mutant race of darkness-dwelling humanoids.</b>")
 						to_chat(user, "<span class='warning'>Your body reacts violently to light.</span> <span class='notice'>However, it naturally heals in darkness.</span>")
 						to_chat(user, "Aside from your new traits, you are mentally unchanged and retain your prior obligations.")
-						human.set_species("Shadow")
+						human.set_species(/datum/species/shadow)
 				user.regenerate_icons()
 			if("Immortality")
 				to_chat(user, "<B>Your wish is granted, but at a terrible cost...</B>")
@@ -108,42 +107,18 @@
 				user.verbs += /mob/living/carbon/proc/immortality
 				if(ishuman(user))
 					var/mob/living/carbon/human/human = user
-					if(human.species.name != "Shadow")
+					if(!isshadowperson(human))
 						to_chat(user, "<span class='warning'>Your flesh rapidly mutates!</span>")
 						to_chat(user, "<b>You are now a Shadow Person, a mutant race of darkness-dwelling humanoids.</b>")
 						to_chat(user, "<span class='warning'>Your body reacts violently to light.</span> <span class='notice'>However, it naturally heals in darkness.</span>")
 						to_chat(user, "Aside from your new traits, you are mentally unchanged and retain your prior obligations.")
-						human.set_species("Shadow")
-				user.regenerate_icons()
-			if("To Kill")
-				to_chat(user, "<B>Your wish is granted, but at a terrible cost...</B>")
-				to_chat(user, "The Wish Granter punishes you for your wickedness, claiming your soul and warping your body to match the darkness in your heart.")
-				ticker.mode.traitors += user.mind
-				user.mind.special_role = SPECIAL_ROLE_TRAITOR
-				var/datum/objective/hijack/hijack = new
-				hijack.owner = user.mind
-				user.mind.objectives += hijack
-				to_chat(user, "<B>Your inhibitions are swept away, the bonds of loyalty broken, you are free to murder as you please!</B>")
-				var/obj_count = 1
-				for(var/datum/objective/OBJ in user.mind.objectives)
-					to_chat(user, "<B>Objective #[obj_count]</B>: [OBJ.explanation_text]")
-					obj_count++
-				if(ishuman(user))
-					var/mob/living/carbon/human/human = user
-					if(human.species.name != "Shadow")
-						to_chat(user, "<span class='warning'>Your flesh rapidly mutates!</span>")
-						to_chat(user, "<b>You are now a Shadow Person, a mutant race of darkness-dwelling humanoids.</b>")
-						to_chat(user, "<span class='warning'>Your body reacts violently to light.</span> <span class='notice'>However, it naturally heals in darkness.</span>")
-						to_chat(user, "Aside from your new traits, you are mentally unchanged and retain your prior obligations.")
-						human.set_species("Shadow")
+						human.set_species(/datum/species/shadow)
 				user.regenerate_icons()
 			if("Peace")
 				to_chat(user, "<B>Whatever alien sentience that the Wish Granter possesses is satisfied with your wish. There is a distant wailing as the last of the Faithless begin to die, then silence.</B>")
 				to_chat(user, "You feel as if you just narrowly avoided a terrible fate...")
-				for(var/mob/living/simple_animal/hostile/faithless/F in world)
-					F.health = -10
-					F.stat = 2
-					F.icon_state = "faithless_dead"
+				for(var/mob/living/simple_animal/hostile/faithless/F in GLOB.mob_living_list)
+					F.death()
 
 
 ///////////////Meatgrinder//////////////
@@ -163,7 +138,7 @@
 /obj/effect/meatgrinder/New()
 	icon_state = "blobpod"
 
-/obj/effect/meatgrinder/Crossed(AM as mob|obj)
+/obj/effect/meatgrinder/Crossed(AM as mob|obj, oldloc)
 	Bumped(AM)
 
 /obj/effect/meatgrinder/Bumped(mob/M as mob|obj)
@@ -177,10 +152,8 @@
 		call(src,triggerproc)(M)
 
 /obj/effect/meatgrinder/proc/triggerrad1(mob)
-	var/datum/effect_system/spark_spread/s = new /datum/effect_system/spark_spread
 	for(var/mob/O in viewers(world.view, src.loc))
-		s.set_up(3, 1, src)
-		s.start()
+		do_sparks(3, 1, src)
 		explosion(mob, 1, 0, 0, 0)
 		qdel(src)
 
@@ -198,23 +171,9 @@
 	to_chat(C, "<span class='notice'>Death is not your end!</span>")
 
 	spawn(rand(800,1200))
-		if(C.stat == DEAD)
-			dead_mob_list -= C
-			living_mob_list += C
-		C.stat = CONSCIOUS
-		C.timeofdeath = 0
-		C.setToxLoss(0)
-		C.setOxyLoss(0)
-		C.setCloneLoss(0)
-		C.SetParalysis(0)
-		C.SetStunned(0)
-		C.SetWeakened(0)
-		C.radiation = 0
-		C.heal_overall_damage(C.getBruteLoss(), C.getFireLoss())
-		C.reagents.clear_reagents()
+		C.revive()
 		to_chat(C, "<span class='notice'>You have regenerated.</span>")
 		C.visible_message("<span class='warning'>[usr] appears to wake from the dead, having healed all wounds.</span>")
-		C.update_canmove()
 	return 1
 
 /obj/item/wildwest_communicator
@@ -259,7 +218,8 @@
 			to_chat(user, "<span class='warning'>The communicator buzzes, and you hear the voice again: 'Really? I think not. Get them!'</span>")
 		if(option_threat)
 			to_chat(user, "<span class='warning'>The communicator buzzes, and you hear the voice again: 'Oh really now?' You hear a clicking sound. 'Team, get back here. We have trouble'. Then the line goes dead.</span>")
-			for(var/obj/effect/landmark/L in landmarks_list)
+			for(var/thing in GLOB.landmarks_list)
+				var/obj/effect/landmark/L = thing
 				if(L.name == "wildwest_syndipod")
 					var/obj/spacepod/syndi/P = new /obj/spacepod/syndi(get_turf(L))
 					P.name = "Syndi Recon Pod"
@@ -272,7 +232,7 @@
 	used = TRUE
 
 /obj/item/wildwest_communicator/proc/stand_down()
-	for(var/mob/living/simple_animal/hostile/syndicate/ranged/wildwest/W in living_mob_list)
+	for(var/mob/living/simple_animal/hostile/syndicate/ranged/wildwest/W in GLOB.alive_mob_list)
 		W.on_alert = FALSE
 
 /mob/living/simple_animal/hostile/syndicate/ranged/wildwest
@@ -284,8 +244,9 @@
 	return list()
 
 /mob/living/simple_animal/hostile/syndicate/ranged/wildwest/death(gibbed)
-	if(!on_alert)
+	// putting this up here so we don't say anything after deathgasp
+	if(can_die() && !on_alert)
 		say("How could you betray the Syndicate?")
-		for(var/mob/living/simple_animal/hostile/syndicate/ranged/wildwest/W in living_mob_list)
+		for(var/mob/living/simple_animal/hostile/syndicate/ranged/wildwest/W in GLOB.alive_mob_list)
 			W.on_alert = TRUE
-	..(gibbed)
+	return ..(gibbed)

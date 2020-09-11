@@ -1,20 +1,20 @@
 /client/proc/only_one()
-	if(!ticker)
+	if(!SSticker)
 		alert("The game hasn't started yet!")
 		return
 
-	var/list/incompatible_species = list("Plasmaman", "Vox")
-	for(var/mob/living/carbon/human/H in player_list)
+	var/list/incompatible_species = list(/datum/species/plasmaman, /datum/species/vox)
+	for(var/mob/living/carbon/human/H in GLOB.player_list)
 		if(H.stat == DEAD || !(H.client))
 			continue
 		if(is_special_character(H))
 			continue
-		if(H.species.name in incompatible_species)
-			H.set_species("Human")
+		if(is_type_in_list(H.dna.species, incompatible_species))
+			H.set_species(/datum/species/human)
 			var/datum/preferences/A = new()	// Randomize appearance
 			A.copy_to(H)
 
-		ticker.mode.traitors += H.mind
+		SSticker.mode.traitors += H.mind
 		H.mind.special_role = SPECIAL_ROLE_TRAITOR
 
 		var/datum/objective/hijack/hijack_objective = new
@@ -49,24 +49,24 @@
 		W.assignment = "Highlander"
 		W.registered_name = H.real_name
 		H.equip_to_slot_or_del(W, slot_wear_id)
-		H.species.after_equip_job(null, H)
+		H.dna.species.after_equip_job(null, H)
 		H.regenerate_icons()
 
 	message_admins("[key_name_admin(usr)] used THERE CAN BE ONLY ONE! -NO ATTACK LOGS WILL BE SENT TO ADMINS FROM THIS POINT FORTH-", 1)
 	log_admin("[key_name(usr)] used there can be only one.")
-	nologevent = 1
-	world << sound('sound/music/THUNDERDOME.ogg')
+	GLOB.nologevent = 1
+	world << sound('sound/music/thunderdome.ogg')
 
 /client/proc/only_me()
-	if(!ticker)
+	if(!SSticker)
 		alert("The game hasn't started yet!")
 		return
 
-	for(var/mob/living/carbon/human/H in player_list)
+	for(var/mob/living/carbon/human/H in GLOB.player_list)
 		if(H.stat == 2 || !(H.client)) continue
 		if(is_special_character(H)) continue
 
-		ticker.mode.traitors += H.mind
+		SSticker.mode.traitors += H.mind
 		H.mind.special_role = "[H.real_name] Prime"
 
 		var/datum/objective/hijackclone/hijack_objective = new /datum/objective/hijackclone
@@ -84,7 +84,7 @@
 		var/obj/item/slot_item_hand = H.get_item_by_slot(slot_r_hand)
 		H.unEquip(slot_item_hand)
 
-		var /obj/item/multisword/pure_evil/multi = new(H)
+		var/obj/item/multisword/pure_evil/multi = new(H)
 		H.equip_to_slot_or_del(multi, slot_r_hand)
 
 		var/obj/item/card/id/W = new(H)
@@ -100,5 +100,5 @@
 
 	message_admins("[key_name_admin(usr)] used THERE CAN BE ONLY ME! -NO ATTACK LOGS WILL BE SENT TO ADMINS FROM THIS POINT FORTH-", 1)
 	log_admin("[key_name(usr)] used there can be only me.")
-	nologevent = 1
-	world << sound('sound/music/THUNDERDOME.ogg')
+	GLOB.nologevent = 1
+	world << sound('sound/music/thunderdome.ogg')

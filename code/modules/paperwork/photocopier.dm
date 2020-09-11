@@ -7,10 +7,12 @@
 	var/insert_anim = "bigscanner1"
 	anchored = 1
 	density = 1
-	use_power = 1
+	use_power = IDLE_POWER_USE
 	idle_power_usage = 30
 	active_power_usage = 200
 	power_channel = EQUIP
+	max_integrity = 300
+	integrity_failure = 100
 	var/emag_cooldown
 	atom_say_verb = "bleeps"
 	var/obj/item/copyitem = null	//what's in the copier!
@@ -62,6 +64,16 @@
 			if(toner <= 0)
 				break
 
+			if(GLOB.copier_items_printed >= GLOB.copier_max_items) //global vars defined in misc.dm
+				if(prob(10))
+					visible_message("<span class='warning'>The printer screen reads \"PC LOAD LETTER\".</span>")
+				else
+					visible_message("<span class='warning'>The printer screen reads \"PHOTOCOPIER NETWORK OFFLINE, PLEASE CONTACT SYSTEM ADMINISTRATOR\".</span>")
+				if(!GLOB.copier_items_printed_logged)
+					message_admins("Photocopier cap of [GLOB.copier_max_items] papers reached, all photocopiers are now disabled. This may be the cause of any lag.")
+					GLOB.copier_items_printed_logged = TRUE
+				break
+
 			if(emag_cooldown > world.time)
 				return
 
@@ -72,15 +84,21 @@
 				photocopy(copyitem)
 				sleep(15)
 			else if(istype(copyitem, /obj/item/paper_bundle))
+				var/obj/item/paper_bundle/C = copyitem
+				if(toner < (C.amount + 1))
+					visible_message("<span class='notice'>A yellow light on [src] flashes, indicating there's not enough toner for the operation.</span>") // It is better to prevent partial bundle than to produce broken paper bundle
+					return
 				var/obj/item/paper_bundle/B = bundlecopy(copyitem)
+				if(!B)
+					return
 				sleep(15*B.amount)
-			else if(ass && ass.loc == src.loc)
+			else if(ass && ass.loc == loc)
 				copyass()
 				sleep(15)
 			else
 				to_chat(usr, "<span class='warning'>\The [copyitem] can't be copied by \the [src].</span>")
 				break
-
+			GLOB.copier_items_printed++
 			use_power(active_power_usage)
 		updateUsrDialog()
 	else if(href_list["remove"])
@@ -149,10 +167,6 @@
 			updateUsrDialog()
 		else
 			to_chat(user, "<span class='notice'>This cartridge is not yet ready for replacement! Use up the rest of the toner.</span>")
-	else if(istype(O, /obj/item/wrench))
-		playsound(loc, O.usesound, 50, 1)
-		anchored = !anchored
-		to_chat(user, "<span class='notice'>You [anchored ? "wrench" : "unwrench"] \the [src].</span>")
 	else if(istype(O, /obj/item/grab)) //For ass-copying.
 		var/obj/item/grab/G = O
 		if(ismob(G.affecting) && G.affecting != ass)
@@ -164,38 +178,18 @@
 				copyitem.forceMove(get_turf(src))
 				copyitem = null
 		updateUsrDialog()
-	return
-
-/obj/machinery/photocopier/ex_act(severity)
-	switch(severity)
-		if(1.0)
-			qdel(src)
-		if(2.0)
-			if(prob(50))
-				qdel(src)
-			else
-				if(toner > 0)
-					new /obj/effect/decal/cleanable/blood/oil(get_turf(src))
-					toner = 0
-		else
-			if(prob(50))
-				if(toner > 0)
-					new /obj/effect/decal/cleanable/blood/oil(get_turf(src))
-					toner = 0
-	return
-
-/obj/machinery/photocopier/blob_act()
-	if(prob(50))
-		qdel(src)
 	else
-		if(toner > 0)
-			new /obj/effect/decal/cleanable/blood/oil(get_turf(src))
-			toner = 0
-	return
+		return ..()
+
+/obj/machinery/photocopier/wrench_act(mob/user, obj/item/I)
+	. = TRUE
+	default_unfasten_wrench(user, I)
 
 /obj/machinery/photocopier/proc/copy(var/obj/item/paper/copy)
 	var/obj/item/paper/c = new /obj/item/paper (loc)
+	c.header = copy.header
 	c.info = copy.info
+	c.footer = copy.footer
 	c.name = copy.name // -- Doohl
 	c.fields = copy.fields
 	c.stamps = copy.stamps
@@ -207,7 +201,7 @@
 	var/image/img                                //and puts a matching
 	for(var/j = 1, j <= temp_overlays.len, j++) //gray overlay onto the copy
 		if(copy.ico.len)
-			if(findtext(copy.ico[j], "cap") || findtext(copy.ico[j], "cent"))
+			if(findtext(copy.ico[j], "cap") || findtext(copy.ico[j], "cent") || findtext(copy.ico[j], "rep"))
 				img = image('icons/obj/bureaucracy.dmi', "paper_stamp-circle")
 			else if(findtext(copy.ico[j], "deny"))
 				img = image('icons/obj/bureaucracy.dmi', "paper_stamp-x")
@@ -260,7 +254,7 @@
 			emag_cooldown = world.time + EMAG_DELAY
 	if(ishuman(ass)) //Suit checks are in check_ass
 		var/mob/living/carbon/human/H = ass
-		temp_img = icon('icons/obj/butts.dmi', H.species.butt_sprite)
+		temp_img = icon('icons/obj/butts.dmi', H.dna.species.butt_sprite)
 	else if(istype(ass,/mob/living/silicon/robot/drone))
 		temp_img = icon('icons/obj/butts.dmi', "drone")
 	else if(istype(ass,/mob/living/simple_animal/diona))
@@ -287,7 +281,7 @@
 
 //If need_toner is 0, the copies will still be lightened when low on toner, however it will not be prevented from printing. TODO: Implement print queues for fax machines and get rid of need_toner
 /obj/machinery/photocopier/proc/bundlecopy(var/obj/item/paper_bundle/bundle, var/need_toner=1)
-	var/obj/item/paper_bundle/p = new /obj/item/paper_bundle (src)
+	var/obj/item/paper_bundle/P = new /obj/item/paper_bundle (src, default_papers = FALSE)
 	for(var/obj/item/W in bundle)
 		if(toner <= 0 && need_toner)
 			toner = 0
@@ -298,17 +292,25 @@
 			W = copy(W)
 		else if(istype(W, /obj/item/photo))
 			W = photocopy(W)
-		W.forceMove(p)
-		p.amount++
-	p.amount--
-	p.forceMove(get_turf(src))
-	p.update_icon()
-	p.icon_state = "paper_words"
-	p.name = bundle.name
-	p.pixel_y = rand(-8, 8)
-	p.pixel_x = rand(-9, 9)
-	return p
+		W.forceMove(P)
+		P.amount++
+	if(!P.amount)
+		qdel(P)
+		return null
+	P.amount--
+	P.forceMove(get_turf(src))
+	P.update_icon()
+	P.icon_state = "paper_words"
+	P.name = bundle.name
+	P.pixel_y = rand(-8, 8)
+	P.pixel_x = rand(-9, 9)
+	return P
 
+/obj/machinery/photocopier/obj_break(damage_flag)
+	if(!(flags & NODECONSTRUCT))
+		if(toner > 0)
+			new /obj/effect/decal/cleanable/blood/oil(get_turf(src))
+			toner = 0
 
 /obj/machinery/photocopier/MouseDrop_T(mob/target, mob/user)
 	check_ass() //Just to make sure that you can re-drag somebody onto it after they moved off.
@@ -317,7 +319,7 @@
 	src.add_fingerprint(user)
 	if(target == user && !user.incapacitated())
 		visible_message("<span class='warning'>[usr] jumps onto [src]!</span>")
-	else if(target != user && !user.restrained() && !user.stat && !user.weakened && !user.stunned && !user.paralysis)
+	else if(target != user && !user.restrained() && !user.stat && !user.IsWeakened() && !user.stunned && !user.paralysis)
 		if(target.anchored) return
 		if(!ishuman(user)) return
 		visible_message("<span class='warning'>[usr] drags [target.name] onto [src]!</span>")
@@ -338,7 +340,7 @@
 		return 0
 	else
 		playsound(loc, 'sound/machines/ping.ogg', 50, 0)
-		atom_say("<span class='danger'>Attention: Posterior Placed on Printing Plaque!</span>")
+		atom_say("Attention: Posterior Placed on Printing Plaque!")
 		return 1
 
 /obj/machinery/photocopier/emag_act(user as mob)

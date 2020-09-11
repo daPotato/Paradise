@@ -20,7 +20,7 @@
 		return
 
 	if(use_power(charge_rate, charging=1))
-		holder.give_power(charge_rate * CELLRATE)
+		holder.give_power(charge_rate * GLOB.CELLRATE)
 
 
 /obj/item/computer_hardware/recharger/APC
@@ -39,7 +39,7 @@
 
 	else
 		var/area/A = get_area(src)
-		if(!A || !isarea(A))
+		if(!istype(A))
 			return 0
 
 		if(A.powered(EQUIP))

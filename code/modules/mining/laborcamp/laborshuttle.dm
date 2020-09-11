@@ -4,7 +4,7 @@
 	circuit = /obj/item/circuitboard/labor_shuttle
 	shuttleId = "laborcamp"
 	possible_destinations = "laborcamp_home;laborcamp_away"
-	req_access = list(access_brig)
+	req_access = list(ACCESS_BRIG)
 
 
 /obj/machinery/computer/shuttle/labor/one_way
@@ -16,7 +16,7 @@
 
 /obj/machinery/computer/shuttle/labor/one_way/Topic(href, href_list)
 	if(href_list["move"])
-		var/obj/docking_port/mobile/M = shuttle_master.getShuttle("laborcamp")
+		var/obj/docking_port/mobile/M = SSshuttle.getShuttle("laborcamp")
 		if(!M)
 			to_chat(usr, "<span class='warning'>Cannot locate shuttle!</span>")
 			return 0

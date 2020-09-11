@@ -37,8 +37,7 @@
 	add_to_streak("G",D)
 	if(check_streak(A,D))
 		return 1
-	D.grabbedby(A,1)
-	var/obj/item/grab/G = A.get_active_hand()
+	var/obj/item/grab/G = D.grabbedby(A,1)
 	if(G)
 		G.state = GRAB_NECK
 
@@ -59,12 +58,6 @@
 			var/mob/living/simple_animal/P = new O.type(O.loc)
 			P.real_name = O.real_name
 			P.name = O.name
-			if(iscorgi(O))
-				var/mob/living/simple_animal/pet/corgi/C = O
-				if(C.inventory_head)
-					C.inventory_head.loc = C.loc
-				if(C.inventory_back)
-					C.inventory_back.loc = C.loc
 			if(O.mind)
 				O.mind.transfer_to(P)
 			else
@@ -75,7 +68,7 @@
 			D.revive()
 			D.suiciding = 0
 		if(!D.ckey)
-			for(var/mob/dead/observer/ghost in player_list)
+			for(var/mob/dead/observer/ghost in GLOB.player_list)
 				if(D.real_name == ghost.real_name)
 					ghost.reenter_corpse()
 					break

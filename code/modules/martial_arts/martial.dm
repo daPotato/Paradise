@@ -6,6 +6,8 @@
 	var/temporary = 0
 	var/datum/martial_art/base = null // The permanent style
 	var/deflection_chance = 0 //Chance to deflect projectiles
+	var/block_chance = 0 //Chance to block melee attacks using items while on throw mode.
+	var/restraining = 0 //used in cqc's disarm_act to check if the disarmed is being restrained and so whether they should be put in a chokehold or not
 	var/help_verb = null
 	var/no_guns = FALSE	//set to TRUE to prevent users of this style from using guns (sleeping carp, highlander). They can still pick them up, but not fire them.
 	var/no_guns_message = ""	//message to tell the style user if they try and use a gun while no_guns = TRUE (DISHONORABRU!)
@@ -22,6 +24,9 @@
 /datum/martial_art/proc/help_act(var/mob/living/carbon/human/A, var/mob/living/carbon/human/D)
 	return 0
 
+/datum/martial_art/proc/can_use(mob/living/carbon/human/H)
+	return TRUE
+
 /datum/martial_art/proc/add_to_streak(var/element,var/mob/living/carbon/human/D)
 	if(D != current_target)
 		current_target = D
@@ -33,8 +38,8 @@
 
 /datum/martial_art/proc/basic_hit(var/mob/living/carbon/human/A,var/mob/living/carbon/human/D)
 
-	var/damage = rand(A.species.punchdamagelow, A.species.punchdamagehigh)
-	var/datum/unarmed_attack/attack = A.species.unarmed
+	var/damage = rand(A.dna.species.punchdamagelow, A.dna.species.punchdamagehigh)
+	var/datum/unarmed_attack/attack = A.dna.species.unarmed
 
 	var/atk_verb = "[pick(attack.attack_verb)]"
 	if(D.lying)
@@ -51,7 +56,7 @@
 		D.visible_message("<span class='warning'>[A] has attempted to [atk_verb] [D]!</span>")
 		return 0
 
-	var/obj/item/organ/external/affecting = D.get_organ(ran_zone(A.zone_sel.selecting))
+	var/obj/item/organ/external/affecting = D.get_organ(ran_zone(A.zone_selected))
 	var/armor_block = D.run_armor_check(affecting, "melee")
 
 	playsound(D.loc, attack.attack_sound, 25, 1, -1)
@@ -60,15 +65,15 @@
 
 	D.apply_damage(damage, BRUTE, affecting, armor_block)
 
-	add_attack_logs(A, D, "Melee attacked with martial-art [src]", admin_notify = (damage > 0) ? TRUE : FALSE)
+	add_attack_logs(A, D, "Melee attacked with martial-art [src]", (damage > 0) ? null : ATKLOG_ALL)
 
-	if((D.stat != DEAD) && damage >= A.species.punchstunthreshold)
+	if((D.stat != DEAD) && damage >= A.dna.species.punchstunthreshold)
 		D.visible_message("<span class='danger'>[A] has weakened [D]!!</span>", \
 								"<span class='userdanger'>[A] has weakened [D]!</span>")
 		D.apply_effect(4, WEAKEN, armor_block)
-		D.forcesay(hit_appends)
+		D.forcesay(GLOB.hit_appends)
 	else if(D.lying)
-		D.forcesay(hit_appends)
+		D.forcesay(GLOB.hit_appends)
 	return 1
 
 /datum/martial_art/proc/teach(var/mob/living/carbon/human/H,var/make_temporary=0)
@@ -143,6 +148,7 @@
 /obj/item/plasma_fist_scroll/attack_self(mob/user as mob)
 	if(!ishuman(user))
 		return
+
 	if(!used)
 		var/mob/living/carbon/human/H = user
 		var/datum/martial_art/plasma_fist/F = new/datum/martial_art/plasma_fist(null)
@@ -162,6 +168,14 @@
 /obj/item/sleeping_carp_scroll/attack_self(mob/living/carbon/human/user as mob)
 	if(!istype(user) || !user)
 		return
+	if(user.mind && (user.mind.changeling || user.mind.vampire)) //Prevents changelings and vampires from being able to learn it
+		if(user.mind && user.mind.changeling) //Changelings
+			to_chat(user, "<span class ='warning'>We try multiple times, but we are not able to comprehend the contents of the scroll!</span>")
+			return
+		else //Vampires
+			to_chat(user, "<span class ='warning'>Your blood lust distracts you too much to be able to concentrate on the contents of the scroll!</span>")
+			return
+
 	to_chat(user, "<span class='sciradio'>You have learned the ancient martial art of the Sleeping Carp! \
 					Your hand-to-hand combat has become much more effective, and you are now able to deflect any projectiles directed toward you. \
 					However, you are also unable to use any ranged weaponry. \
@@ -172,6 +186,27 @@
 	theSleepingCarp.teach(user)
 	user.drop_item()
 	visible_message("<span class='warning'>[src] lights up in fire and quickly burns to ash.</span>")
+	new /obj/effect/decal/cleanable/ash(get_turf(src))
+	qdel(src)
+
+/obj/item/CQC_manual
+	name = "old manual"
+	desc = "A small, black manual. There are drawn instructions of tactical hand-to-hand combat."
+	icon = 'icons/obj/library.dmi'
+	icon_state = "cqcmanual"
+
+/obj/item/CQC_manual/chef
+	desc = "A small, black manual. Written on the back it says: Bringing the home advantage with you."
+
+/obj/item/CQC_manual/attack_self(mob/living/carbon/human/user)
+	if(!istype(user) || !user)
+		return
+	to_chat(user, "<span class='boldannounce'>You remember the basics of CQC.</span>")
+
+	var/datum/martial_art/cqc/CQC = new(null)
+	CQC.teach(user)
+	user.drop_item()
+	visible_message("<span class='warning'>[src] beeps ominously, and a moment later it bursts up in flames.</span>")
 	new /obj/effect/decal/cleanable/ash(get_turf(src))
 	qdel(src)
 
@@ -195,7 +230,7 @@
 
 /obj/item/twohanded/bostaff/attack(mob/target, mob/living/user)
 	add_fingerprint(user)
-	if((CLUMSY in user.disabilities) && prob(50))
+	if((CLUMSY in user.mutations) && prob(50))
 		to_chat(user, "<span class ='warning'>You club yourself over the head with [src].</span>")
 		user.Weaken(3)
 		if(ishuman(user))
@@ -235,7 +270,7 @@
 				H.Weaken(4)
 			if(H.staminaloss && !H.sleeping)
 				var/total_health = (H.health - H.staminaloss)
-				if(total_health <= config.health_threshold_crit && !H.stat)
+				if(total_health <= HEALTH_THRESHOLD_CRIT && !H.stat)
 					H.visible_message("<span class='warning'>[user] delivers a heavy hit to [H]'s head, knocking [H.p_them()] out cold!</span>", \
 										   "<span class='userdanger'>[user] knocks you unconscious!</span>")
 					H.SetSleeping(30)
@@ -243,9 +278,8 @@
 			return
 		else
 			return ..()
-	return ..()
 
-/obj/item/twohanded/bostaff/hit_reaction(mob/living/carbon/human/owner, attack_text, final_block_chance)
+/obj/item/twohanded/bostaff/hit_reaction(mob/living/carbon/human/owner, atom/movable/hitby, attack_text = "the attack", final_block_chance = 0, damage = 0, attack_type = MELEE_ATTACK)
 	if(wielded)
 		return ..()
 	return 0

@@ -53,12 +53,11 @@
 	hud.master = src
 
 	//check if assailant is grabbed by victim as well
-	if(assailant.grabbed_by)
-		for(var/obj/item/grab/G in assailant.grabbed_by)
-			if(G.assailant == affecting && G.affecting == assailant)
-				G.dancing = 1
-				G.adjust_position()
-				dancing = 1
+	for(var/obj/item/grab/G in assailant.grabbed_by)
+		if(G.assailant == affecting && G.affecting == assailant)
+			G.dancing = 1
+			G.adjust_position()
+			dancing = 1
 
 	clean_grabbed_by(assailant, affecting)
 	adjust_position()
@@ -106,7 +105,7 @@
 		assailant.client.screen -= hud
 		assailant.client.screen += hud
 
-	var/hit_zone = assailant.zone_sel.selecting
+	var/hit_zone = assailant.zone_selected
 	last_hit_zone = hit_zone
 
 	if(assailant.pulling == affecting)
@@ -139,8 +138,9 @@
 			hud.icon_state = "!reinforce"
 
 	if(state >= GRAB_AGGRESSIVE)
-		affecting.drop_r_hand()
-		affecting.drop_l_hand()
+		if(!HAS_TRAIT(assailant, TRAIT_PACIFISM))
+			affecting.drop_r_hand()
+			affecting.drop_l_hand()
 
 
 		//var/announce = 0
@@ -214,12 +214,12 @@
 			shift = -10
 			adir = assailant.dir
 			affecting.setDir(assailant.dir)
-			affecting.loc = assailant.loc
+			affecting.forceMove(assailant.loc)
 		if(GRAB_KILL)
 			shift = 0
 			adir = 1
 			affecting.setDir(SOUTH)//face up
-			affecting.loc = assailant.loc
+			affecting.forceMove(assailant.loc)
 
 	switch(adir)
 		if(NORTH)
@@ -234,6 +234,9 @@
 
 /obj/item/grab/proc/s_click(obj/screen/S)
 	if(!affecting)
+		return
+	if(state >= GRAB_AGGRESSIVE && HAS_TRAIT(assailant, TRAIT_PACIFISM))
+		to_chat(assailant, "<span class='warning'>You don't want to risk hurting [affecting]!</span>")
 		return
 	if(state == GRAB_UPGRADING)
 		return
@@ -263,7 +266,7 @@
 		state = GRAB_AGGRESSIVE
 		icon_state = "grabbed1"
 		hud.icon_state = "reinforce1"
-		add_attack_logs(assailant, affecting, "Aggressively grabbed", admin_notify = FALSE)
+		add_attack_logs(assailant, affecting, "Aggressively grabbed", ATKLOG_ALL)
 	else if(state < GRAB_NECK)
 		if(isslime(affecting))
 			to_chat(assailant, "<span class='notice'>You squeeze [affecting], but nothing interesting happens.</span>")
@@ -272,8 +275,8 @@
 		assailant.visible_message("<span class='warning'>[assailant] has reinforced [assailant.p_their()] grip on [affecting] (now neck)!</span>")
 		state = GRAB_NECK
 		icon_state = "grabbed+1"
-		assailant.setDir(get_dir(assailant, affecting))
-		add_attack_logs(assailant, affecting, "Neck grabbed", admin_notify = FALSE)
+
+		add_attack_logs(assailant, affecting, "Neck grabbed", ATKLOG_ALL)
 		if(!iscarbon(assailant))
 			affecting.LAssailant = null
 		else
@@ -292,7 +295,7 @@
 		assailant.next_move = world.time + 10
 		if(!affecting.get_organ_slot("breathing_tube"))
 			affecting.AdjustLoseBreath(1)
-		affecting.setDir(WEST)
+
 	adjust_position()
 
 //This is used to make sure the victim hasn't managed to yackety sax away before using the grab.
@@ -387,30 +390,33 @@
 	if(M == assailant && state >= GRAB_AGGRESSIVE) //no eatin unless you have an agressive grab
 		if(checkvalid(user, affecting)) //wut
 			var/mob/living/carbon/attacker = user
+
+			if(affecting.buckled)
+				to_chat(user, "<span class='warning'>[affecting] is buckled!</span>")
+				return
+
 			user.visible_message("<span class='danger'>[user] is attempting to devour \the [affecting]!</span>")
 
 			if(!do_after(user, checktime(user, affecting), target = affecting)) return
+
+			if(affecting.buckled)
+				to_chat(user, "<span class='warning'>[affecting] is buckled!</span>")
+				return
 
 			user.visible_message("<span class='danger'>[user] devours \the [affecting]!</span>")
 			if(affecting.mind)
 				add_attack_logs(attacker, affecting, "Devoured")
 
-			affecting.loc = user
-			attacker.stomach_contents.Add(affecting)
+			affecting.forceMove(user)
+			LAZYADD(attacker.stomach_contents, affecting)
 			qdel(src)
 
 /obj/item/grab/proc/checkvalid(var/mob/attacker, var/mob/prey) //does all the checking for the attack proc to see if a mob can eat another with the grab
-	if(ishuman(attacker) && (/datum/dna/gene/basic/grant_spell/mattereater in attacker.active_genes)) // MATTER EATER CARES NOT OF YOUR FORM
-		return 1
-
-	if(ishuman(attacker) && (FAT in attacker.mutations) && iscarbon(prey) && !isalien(prey)) //Fat people eating carbon mobs but not xenos
-		return 1
-
 	if(isalien(attacker) && iscarbon(prey)) //Xenomorphs eating carbon mobs
 		return 1
 
 	var/mob/living/carbon/human/H = attacker
-	if(ishuman(H) && is_type_in_list(prey,  H.species.allowed_consumed_mobs)) //species eating of other mobs
+	if(ishuman(H) && is_type_in_list(prey,  H.dna.species.allowed_consumed_mobs)) //species eating of other mobs
 		return 1
 
 	return 0
@@ -426,9 +432,10 @@
 
 /obj/item/grab/Destroy()
 	if(affecting)
-		affecting.pixel_x = 0
-		affecting.pixel_y = 0 //used to be an animate, not quick enough for del'ing
-		affecting.layer = initial(affecting.layer)
+		if(!affecting.buckled)
+			affecting.pixel_x = 0
+			affecting.pixel_y = 0 //used to be an animate, not quick enough for qdel'ing
+			affecting.layer = initial(affecting.layer)
 		affecting.grabbed_by -= src
 		affecting = null
 	if(assailant)

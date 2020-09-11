@@ -19,20 +19,24 @@
 	GM.carbon_dioxide = carbon_dioxide
 	GM.nitrogen = nitrogen
 	GM.toxins = toxins
+	GM.sleeping_agent = sleeping_agent
+	GM.agent_b = agent_b
 
 	GM.temperature = temperature
 
 	return GM
 
-/turf/remove_air(amount as num)
+/turf/remove_air(amount)
 	var/datum/gas_mixture/GM = new
 
-	var/sum = oxygen + carbon_dioxide + nitrogen + toxins
-	if(sum>0)
-		GM.oxygen = (oxygen/sum)*amount
-		GM.carbon_dioxide = (carbon_dioxide/sum)*amount
-		GM.nitrogen = (nitrogen/sum)*amount
-		GM.toxins = (toxins/sum)*amount
+	var/sum = oxygen + carbon_dioxide + nitrogen + toxins + sleeping_agent + agent_b
+	if(sum > 0)
+		GM.oxygen = (oxygen / sum) * amount
+		GM.carbon_dioxide = (carbon_dioxide / sum) * amount
+		GM.nitrogen = (nitrogen / sum) * amount
+		GM.toxins = (toxins / sum) * amount
+		GM.sleeping_agent = (sleeping_agent / sum) * amount
+		GM.agent_b = (agent_b / sum) * amount
 
 	GM.temperature = temperature
 
@@ -49,10 +53,11 @@
 	var/icy = 0
 	var/icyoverlay
 	var/obj/effect/hotspot/active_hotspot
+	var/planetary_atmos = FALSE //air will revert to its initial mix over time
 
 	var/temperature_archived //USED ONLY FOR SOLIDS
 
-	var/atmos_overlay_type = "" //current active overlay
+	var/atmos_overlay_type = null //current active overlay
 
 /turf/simulated/New()
 	..()
@@ -63,14 +68,14 @@
 		air.carbon_dioxide = carbon_dioxide
 		air.nitrogen = nitrogen
 		air.toxins = toxins
+		air.sleeping_agent = sleeping_agent
+		air.agent_b = agent_b
 
 		air.temperature = temperature
 
-		update_visuals()
-
 /turf/simulated/Destroy()
-	visibilityChanged()
 	QDEL_NULL(active_hotspot)
+	QDEL_NULL(wet_overlay)
 	return ..()
 
 /turf/simulated/assume_air(datum/gas_mixture/giver)
@@ -101,7 +106,7 @@
 	else
 		return ..()
 
-/turf/simulated/remove_air(amount as num)
+/turf/simulated/remove_air(amount)
 	if(air)
 		var/datum/gas_mixture/removed = null
 
@@ -140,20 +145,23 @@
 
 
 /turf/simulated/proc/process_cell()
-
 	if(archived_cycle < SSair.times_fired) //archive self if not already done
 		archive()
 	current_cycle = SSair.times_fired
 
 	var/remove = 1 //set by non simulated turfs who are sharing with this turf
 
-	for(var/direction in cardinal)
+	var/planet_atmos = planetary_atmos
+	if (planet_atmos)
+		atmos_adjacent_turfs_amount++
+
+	for(var/direction in GLOB.cardinal)
 		if(!(atmos_adjacent_turfs & direction))
 			continue
 
 		var/turf/enemy_tile = get_step(src, direction)
 
-		if(istype(enemy_tile,/turf/simulated))
+		if(istype(enemy_tile, /turf/simulated))
 			var/turf/simulated/enemy_simulated = enemy_tile
 
 			if(current_cycle > enemy_simulated.current_cycle)
@@ -207,7 +215,26 @@
 				if(excited_group)
 					last_share_check()
 
+	if(planet_atmos) //share our air with the "atmosphere" "above" the turf
+		var/datum/gas_mixture/G = new
+		G.oxygen = oxygen
+		G.carbon_dioxide = carbon_dioxide
+		G.nitrogen = nitrogen
+		G.toxins = toxins
+		G.sleeping_agent = sleeping_agent
+		G.agent_b = agent_b
+		G.temperature = initial(temperature) // Temperature is modified at runtime; we only care about the turf's initial temperature
+		G.archive()
+		if(!air.compare(G))
+			if(!excited_group)
+				var/datum/excited_group/EG = new
+				EG.add_turf(src)
+			air.share(G, atmos_adjacent_turfs_amount)
+			last_share_check()
+
 	air.react()
+
+	update_visuals()
 
 	if(air.temperature > FIRE_MINIMUM_TEMPERATURE_TO_EXIST)
 		hotspot_expose(air.temperature, CELL_VOLUME)
@@ -215,16 +242,9 @@
 			item.temperature_expose(air, air.temperature, CELL_VOLUME)
 		temperature_expose(air, air.temperature, CELL_VOLUME)
 
-		if(air.temperature > MINIMUM_TEMPERATURE_START_SUPERCONDUCTION)
-			if(consider_superconductivity(starting = 1))
-				remove = 0
-
-	if(air.temperature < T0C && air.return_pressure() > 10)
-		icy = 1
-	else if(air.temperature > T0C)
-		icy = 0
-
-	update_visuals()
+	if(air.temperature > MINIMUM_TEMPERATURE_START_SUPERCONDUCTION)
+		if(consider_superconductivity(starting = 1))
+			remove = 0
 
 	if(!excited_group && remove == 1)
 		SSair.remove_from_active(src)
@@ -237,42 +257,33 @@
 	archived_cycle = SSair.times_fired
 
 /turf/simulated/proc/update_visuals()
-	if(icy && !icyoverlay)
-		overlays |= icemaster
-		icyoverlay = icemaster
-	else if(icyoverlay && !icy)
-		icyoverlay = null
-		overlays -= icemaster
-
 	var/new_overlay_type = tile_graphic()
 	if(new_overlay_type == atmos_overlay_type)
 		return
 	var/atmos_overlay = get_atmos_overlay_by_name(atmos_overlay_type)
 	if(atmos_overlay)
-		overlays -= atmos_overlay
-		mouse_opacity = 1
+		vis_contents -= atmos_overlay
 
 	atmos_overlay = get_atmos_overlay_by_name(new_overlay_type)
 	if(atmos_overlay)
-		overlays += atmos_overlay
+		vis_contents += atmos_overlay
 		atmos_overlay_type = new_overlay_type
 
-/turf/simulated/proc/get_atmos_overlay_by_name(var/name)
+/turf/simulated/proc/get_atmos_overlay_by_name(name)
 	switch(name)
 		if("plasma")
-			return plmaster
+			return GLOB.plmaster
 		if("sleeping_agent")
-			return slmaster
+			return GLOB.slmaster
 	return null
 
 /turf/simulated/proc/tile_graphic()
+	if(!air)
+		return
 	if(air.toxins > MOLES_PLASMA_VISIBLE)
-		mouse_opacity = 0
 		return "plasma"
 
-	var/datum/gas/sleeping_agent = locate(/datum/gas/sleeping_agent) in air.trace_gases
-	if(sleeping_agent && (sleeping_agent.moles > 1))
-		mouse_opacity = 0
+	if(air.sleeping_agent > 1)
 		return "sleeping_agent"
 	return null
 
@@ -298,61 +309,30 @@
 		excited_group.reset_cooldowns()
 
 /turf/proc/high_pressure_movements()
-	for(var/atom/movable/M in src)
-		M.experience_pressure_difference(pressure_difference, pressure_direction)
+	var/atom/movable/M
+	for(var/thing in src)
+		M = thing
+		if(!M.anchored && !M.pulledby && M.last_high_pressure_movement_air_cycle < SSair.times_fired)
+			M.experience_pressure_difference(pressure_difference, pressure_direction)
 
 
 
 
-/atom/movable/var/pressure_resistance = 5
-/atom/movable/var/throw_pressure_limit = 15
-/atom/movable/var/last_forced_movement = 0
+/atom/movable/var/pressure_resistance = 10
+/atom/movable/var/last_high_pressure_movement_air_cycle = 0
 
-/atom/movable/proc/experience_pressure_difference(pressure_difference, direction)
-	if(last_forced_movement >= SSair.times_fired)
-		return 0
-	else if(!anchored && !pulledby)
-		var/turf/target = get_turf(src)
-		var/datum/gas_mixture/target_air = target.return_air()
-		if(isunsimulatedturf(target) || pressure_resistance > target_air.return_pressure())
-			return 0
-		if(pressure_difference >= throw_pressure_limit)
-			var/general_direction = get_edge_target_turf(src, direction)
-			if(last_forced_movement + 10 < SSair.times_fired && is_valid_tochat_target(src)) //the first check prevents spamming throw to_chat
-				to_chat(src, "<span class='userdanger'>The pressure sends you flying!</span>")
-			spawn()
-				var/max_distance = 14 // reduce by one each calculation to prevent infinate loops.
-				var/min_observed_pressure = INFINITY
-				var/turf/possible_target = get_turf(src)
-				while(!isunsimulatedturf(target) && max_distance > 0)
-					max_distance--
-					target_air = target.return_air()
-					min_observed_pressure = target_air.return_pressure()
-					possible_target = get_step_towards(target,general_direction)
-					if(istype(possible_target, /turf/space))
-						target = possible_target
-						break
-					if(!CanAtmosPass(possible_target))
-						target = possible_target
-						max_distance = 0
-						break
-					var/datum/gas_mixture/possible_target_air = possible_target.return_air()
-					if(possible_target_air.return_pressure() > min_observed_pressure)
-						target = possible_target
-						break
-					target = possible_target
-				if(max_distance)
-					throw_at(target, get_dist(src, target), pressure_difference / 200, null, 0, 0, null)
-				else
-					throw_at(target, pressure_difference / 10, pressure_difference / 200, null, 0, 0, null)
-			last_forced_movement = SSair.times_fired
-			return 1
-		else if(pressure_difference > pressure_resistance)
-			spawn()
-				step(src, direction)
-			last_forced_movement = SSair.times_fired
-			return 1
-	return 0
+/atom/movable/proc/experience_pressure_difference(pressure_difference, direction, pressure_resistance_prob_delta = 0)
+	var/const/PROBABILITY_OFFSET = 25
+	var/const/PROBABILITY_BASE_PRECENT = 75
+	var/max_force = sqrt(pressure_difference) * (MOVE_FORCE_DEFAULT / 5)
+	set waitfor = 0
+	var/move_prob = 100
+	if(pressure_resistance > 0)
+		move_prob = (pressure_difference / pressure_resistance * PROBABILITY_BASE_PRECENT) - PROBABILITY_OFFSET
+	move_prob += pressure_resistance_prob_delta
+	if(move_prob > PROBABILITY_OFFSET && prob(move_prob) && (move_resist != INFINITY) && (!anchored && (max_force >= (move_resist * MOVE_FORCE_PUSH_RATIO))) || (anchored && (max_force >= (move_resist * MOVE_FORCE_FORCEPUSH_RATIO))))
+		step(src, direction)
+		last_high_pressure_movement_air_cycle = SSair.times_fired
 
 
 
@@ -371,7 +351,7 @@
 	reset_cooldowns()
 
 /datum/excited_group/proc/merge_groups(var/datum/excited_group/E)
-	if(turf_list.len > E.turf_list.len)
+	if(length(turf_list) > length(E.turf_list))
 		SSair.excited_groups -= E
 		for(var/turf/simulated/T in E.turf_list)
 			T.excited_group = src
@@ -389,32 +369,26 @@
 
 /datum/excited_group/proc/self_breakdown()
 	var/datum/gas_mixture/A = new
-	var/datum/gas/sleeping_agent/S = new
-	A.trace_gases += S
-	for(var/turf/simulated/T in turf_list)
-		A.oxygen 		+= T.air.oxygen
-		A.carbon_dioxide+= T.air.carbon_dioxide
-		A.nitrogen 		+= T.air.nitrogen
-		A.toxins 		+= T.air.toxins
 
-		if(T.air.trace_gases.len)
-			for(var/datum/gas/N in T.air.trace_gases)
-				S.moles += N.moles
+	var/list/cached_turf_list = turf_list // cache for super speed
 
-	for(var/turf/simulated/T in turf_list)
-		T.air.oxygen		= A.oxygen/turf_list.len
-		T.air.carbon_dioxide= A.carbon_dioxide/turf_list.len
-		T.air.nitrogen		= A.nitrogen/turf_list.len
-		T.air.toxins		= A.toxins/turf_list.len
+	for(var/turf/simulated/T in cached_turf_list)
+		A.oxygen 			+= T.air.oxygen
+		A.carbon_dioxide	+= T.air.carbon_dioxide
+		A.nitrogen 			+= T.air.nitrogen
+		A.toxins 			+= T.air.toxins
+		A.sleeping_agent 	+= T.air.sleeping_agent
+		A.agent_b 			+= T.air.agent_b
 
-		if(S.moles > 0)
-			if(T.air.trace_gases.len)
-				for(var/datum/gas/G in T.air.trace_gases)
-					G.moles = S.moles/turf_list.len
-			else
-				var/datum/gas/sleeping_agent/G = new
-				G.moles = S.moles/turf_list.len
-				T.air.trace_gases += G
+	var/turflen = length(cached_turf_list)
+
+	for(var/turf/simulated/T in cached_turf_list)
+		T.air.oxygen			= A.oxygen / turflen
+		T.air.carbon_dioxide	= A.carbon_dioxide / turflen
+		T.air.nitrogen			= A.nitrogen / turflen
+		T.air.toxins			= A.toxins / turflen
+		T.air.sleeping_agent	= A.sleeping_agent / turflen
+		T.air.agent_b			= A.agent_b / turflen
 
 		T.update_visuals()
 
@@ -433,16 +407,7 @@
 	turf_list.Cut()
 	SSair.excited_groups -= src
 
-
-
-
-
-
-
-
-
-
-turf/simulated/proc/super_conduct()
+/turf/simulated/proc/super_conduct()
 	var/conductivity_directions = 0
 	if(blocks_air)
 		//Does not participate in air exchange, so will conduct heat across all four borders at this time
@@ -452,13 +417,13 @@ turf/simulated/proc/super_conduct()
 			archive()
 	else
 		//Does particate in air exchange so only consider directions not considered during process_cell()
-		for(var/direction in cardinal)
+		for(var/direction in GLOB.cardinal)
 			if(!(atmos_adjacent_turfs & direction) && !(atmos_supeconductivity & direction))
 				conductivity_directions += direction
 
 	if(conductivity_directions>0)
 		//Conduct with tiles around me
-		for(var/direction in cardinal)
+		for(var/direction in GLOB.cardinal)
 			if(conductivity_directions&direction)
 				var/turf/neighbor = get_step(src,direction)
 
@@ -526,11 +491,11 @@ turf/simulated/proc/consider_superconductivity(starting)
 
 turf/simulated/proc/radiate_to_spess() //Radiate excess tile heat to space
 	if(temperature > T0C) //Considering 0 degC as te break even point for radiation in and out
-		var/delta_temperature = (temperature_archived - 2.7) //hardcoded space temperature
+		var/delta_temperature = (temperature_archived - TCMB) //hardcoded space temperature
 		if((heat_capacity > 0) && (abs(delta_temperature) > MINIMUM_TEMPERATURE_DELTA_TO_CONSIDER))
 
 			var/heat = thermal_conductivity*delta_temperature* \
-				(heat_capacity*700000/(heat_capacity+700000)) //700000 is the heat_capacity from a space turf, hardcoded here
+				(heat_capacity*HEAT_CAPACITY_VACUUM/(heat_capacity+HEAT_CAPACITY_VACUUM)) //700000 is the heat_capacity from a space turf, hardcoded here
 			temperature -= heat/heat_capacity
 
 /turf/proc/Initialize_Atmos(times_fired)
@@ -539,7 +504,7 @@ turf/simulated/proc/radiate_to_spess() //Radiate excess tile heat to space
 /turf/simulated/Initialize_Atmos(times_fired)
 	..()
 	update_visuals()
-	for(var/direction in cardinal)
+	for(var/direction in GLOB.cardinal)
 		if(!(atmos_adjacent_turfs & direction))
 			continue
 		var/turf/enemy_tile = get_step(src, direction)

@@ -9,7 +9,7 @@
 	name = "vampire"
 	config_tag = "vampire"
 	restricted_jobs = list("AI", "Cyborg")
-	protected_jobs = list("Security Officer", "Warden", "Detective", "Head of Security", "Captain", "Blueshield", "Nanotrasen Representative", "Security Pod Pilot", "Magistrate", "Chaplain", "Brig Physician", "Internal Affairs Agent", "Nanotrasen Navy Officer", "Special Operations Officer")
+	protected_jobs = list("Security Officer", "Warden", "Detective", "Head of Security", "Captain", "Blueshield", "Nanotrasen Representative", "Security Pod Pilot", "Magistrate", "Chaplain", "Brig Physician", "Internal Affairs Agent", "Nanotrasen Navy Officer", "Special Operations Officer", "Syndicate Officer")
 	protected_species = list("Machine")
 	required_players = 15
 	required_enemies = 1
@@ -175,6 +175,7 @@
 /datum/game_mode/proc/greet_vampire(var/datum/mind/vampire, var/you_are=1)
 	var/dat
 	if(you_are)
+		SEND_SOUND(vampire.current, 'sound/ambience/antag/vampalert.ogg')
 		dat = "<span class='danger'>You are a Vampire!</span><br>"
 	dat += {"To bite someone, target the head and use harm intent with an empty hand. Drink blood to gain new powers.
 You are weak to holy things and starlight. Don't go into space and avoid the Chaplain, the chapel and especially Holy Water."}
@@ -185,7 +186,8 @@ You are weak to holy things and starlight. Don't go into space and avoid the Cha
 		if(vampire.current.mind.assigned_role == "Clown")
 			to_chat(vampire.current, "Your lust for blood has allowed you to overcome your clumsy nature allowing you to wield weapons without harming yourself.")
 			vampire.current.mutations.Remove(CLUMSY)
-
+			var/datum/action/innate/toggle_clumsy/A = new
+			A.Grant(vampire.current)
 	var/obj_count = 1
 	for(var/datum/objective/objective in vampire.objectives)
 		to_chat(vampire.current, "<B>Objective #[obj_count]</B>: [objective.explanation_text]")
@@ -225,6 +227,7 @@ You are weak to holy things and starlight. Don't go into space and avoid the Cha
 	if(istype(spell, /obj/effect/proc_holder/spell))
 		owner.mind.AddSpell(spell)
 	powers += spell
+	owner.update_sight() // Life updates conditionally, so we need to update sight here in case the vamp gets new vision based on his powers. Maybe one day refactor to be more OOP and on the vampire's ability datum.
 
 /datum/vampire/proc/get_ability(path)
 	for(var/P in powers)
@@ -242,6 +245,7 @@ You are weak to holy things and starlight. Don't go into space and avoid the Cha
 		powers -= ability
 		owner.mind.spell_list.Remove(ability)
 		qdel(ability)
+		owner.update_sight() // Life updates conditionally, so we need to update sight here in case the vamp loses his vision based powers. Maybe one day refactor to be more OOP and on the vampire's ability datum.
 
 /datum/vampire/proc/update_owner(var/mob/living/carbon/human/current) //Called when a vampire gets cloned. This updates vampire.owner to the new body.
 	if(current.mind && current.mind.vampire && current.mind.vampire.owner && (current.mind.vampire.owner != current))
@@ -279,14 +283,14 @@ You are weak to holy things and starlight. Don't go into space and avoid the Cha
 		to_chat(owner, "<span class='warning'>[owner.wear_mask] prevents you from biting [H]!</span>")
 		draining = null
 		return
-	add_attack_logs(owner, H, "vampirebit & is draining their blood.", FALSE)
+	add_attack_logs(owner, H, "vampirebit & is draining their blood.", ATKLOG_ALMOSTALL)
 	owner.visible_message("<span class='danger'>[owner] grabs [H]'s neck harshly and sinks in [owner.p_their()] fangs!</span>", "<span class='danger'>You sink your fangs into [H] and begin to drain [owner.p_their()] blood.</span>", "<span class='notice'>You hear a soft puncture and a wet sucking noise.</span>")
 	if(!iscarbon(owner))
 		H.LAssailant = null
 	else
 		H.LAssailant = owner
 	while(do_mob(owner, H, 50))
-		if(!(owner.mind in ticker.mode.vampires))
+		if(!(owner.mind in SSticker.mode.vampires))
 			to_chat(owner, "<span class='warning'>Your fangs have disappeared!</span>")
 			return
 		old_bloodtotal = bloodtotal
@@ -295,19 +299,27 @@ You are weak to holy things and starlight. Don't go into space and avoid the Cha
 			to_chat(owner, "<span class='warning'>They've got no blood left to give.</span>")
 			break
 		if(H.stat < DEAD)
-			blood = min(20, H.blood_volume)	// if they have less than 20 blood, give them the remnant else they get 20 blood
-			bloodtotal += blood / 2	//divide by 2 to counted the double suction since removing cloneloss -Melandor0
-			bloodusable += blood / 2
+			if(H.ckey || H.player_ghosted) //Requires ckey regardless if monkey or humanoid, or the body has been ghosted before it died
+				blood = min(20, H.blood_volume)	// if they have less than 20 blood, give them the remnant else they get 20 blood
+				bloodtotal += blood / 2	//divide by 2 to counted the double suction since removing cloneloss -Melandor0
+				bloodusable += blood / 2
 		else
-			blood = min(5, H.blood_volume)	// The dead only give 5 blood
-			bloodtotal += blood
+			if(H.ckey || H.player_ghosted)
+				blood = min(5, H.blood_volume)	// The dead only give 5 blood
+				bloodtotal += blood
 		if(old_bloodtotal != bloodtotal)
-			to_chat(owner, "<span class='notice'><b>You have accumulated [bloodtotal] [bloodtotal > 1 ? "units" : "unit"] of blood[bloodusable != old_bloodusable ? ", and have [bloodusable] left to use" : ""].</b></span>")
+			if(H.ckey || H.player_ghosted) // Requires ckey regardless if monkey or human, and has not ghosted, otherwise no power
+				to_chat(owner, "<span class='notice'><b>You have accumulated [bloodtotal] [bloodtotal > 1 ? "units" : "unit"] of blood[bloodusable != old_bloodusable ? ", and have [bloodusable] left to use" : ""].</b></span>")
 		check_vampire_upgrade()
 		H.blood_volume = max(H.blood_volume - 25, 0)
 		if(ishuman(owner))
 			var/mob/living/carbon/human/V = owner
-			V.nutrition = min(NUTRITION_LEVEL_WELL_FED, V.nutrition + (blood / 2))
+			if(!H.ckey && !H.player_ghosted)//Only runs if there is no ckey and the body has not being ghosted while alive
+				to_chat(V, "<span class='notice'><b>Feeding on [H] reduces your thirst, but you get no usable blood from them.</b></span>")
+				V.set_nutrition(min(NUTRITION_LEVEL_WELL_FED, V.nutrition + 5))
+			else
+				V.set_nutrition(min(NUTRITION_LEVEL_WELL_FED, V.nutrition + (blood / 2)))
+
 
 	draining = null
 	to_chat(owner, "<span class='notice'>You stop draining [H.name] of blood.</span>")
@@ -335,9 +347,10 @@ You are weak to holy things and starlight. Don't go into space and avoid the Cha
 
 /datum/game_mode/proc/remove_vampire(datum/mind/vampire_mind)
 	if(vampire_mind in vampires)
-		ticker.mode.vampires -= vampire_mind
+		SSticker.mode.vampires -= vampire_mind
 		vampire_mind.special_role = null
 		vampire_mind.current.create_attack_log("<span class='danger'>De-vampired</span>")
+		vampire_mind.current.create_log(CONVERSION_LOG, "De-vampired")
 		if(vampire_mind.vampire)
 			vampire_mind.vampire.remove_vampire_powers()
 			QDEL_NULL(vampire_mind.vampire)
@@ -345,16 +358,16 @@ You are weak to holy things and starlight. Don't go into space and avoid the Cha
 			to_chat(vampire_mind.current, "<span class='userdanger'>You have been turned into a robot! You can feel your powers fading away...</span>")
 		else
 			to_chat(vampire_mind.current, "<span class='userdanger'>You have been brainwashed! You are no longer a vampire.</span>")
-		ticker.mode.update_vampire_icons_removed(vampire_mind)
+		SSticker.mode.update_vampire_icons_removed(vampire_mind)
 
 //prepare for copypaste
 /datum/game_mode/proc/update_vampire_icons_added(datum/mind/vampire_mind)
-	var/datum/atom_hud/antag/vamp_hud = huds[ANTAG_HUD_VAMPIRE]
+	var/datum/atom_hud/antag/vamp_hud = GLOB.huds[ANTAG_HUD_VAMPIRE]
 	vamp_hud.join_hud(vampire_mind.current)
 	set_antag_hud(vampire_mind.current, ((vampire_mind in vampires) ? "hudvampire" : "hudvampirethrall"))
 
 /datum/game_mode/proc/update_vampire_icons_removed(datum/mind/vampire_mind)
-	var/datum/atom_hud/antag/vampire_hud = huds[ANTAG_HUD_VAMPIRE]
+	var/datum/atom_hud/antag/vampire_hud = GLOB.huds[ANTAG_HUD_VAMPIRE]
 	vampire_hud.leave_hud(vampire_mind.current)
 	set_antag_hud(vampire_mind.current, null)
 
@@ -392,7 +405,14 @@ You are weak to holy things and starlight. Don't go into space and avoid the Cha
 
 		if(T.density)
 			return
-	vamp_burn(1)
+	if(bloodusable >= 10)	//burn through your blood to tank the light for a little while
+		to_chat(owner, "<span class='warning'>The starlight saps your strength!</span>")
+		bloodusable -= 10
+		vamp_burn(10)
+	else		//You're in trouble, get out of the sun NOW
+		to_chat(owner, "<span class='userdanger'>Your body is turning to ash, get out of the light now!</span>")
+		owner.adjustCloneLoss(10)	//I'm melting!
+		vamp_burn(85)
 
 /datum/vampire/proc/handle_vampire()
 	if(owner.hud_used)
@@ -400,16 +420,16 @@ You are weak to holy things and starlight. Don't go into space and avoid the Cha
 		if(!hud.vampire_blood_display)
 			hud.vampire_blood_display = new /obj/screen()
 			hud.vampire_blood_display.name = "Usable Blood"
-			hud.vampire_blood_display.icon_state = "power_display"
+			hud.vampire_blood_display.icon_state = "blood_display"
 			hud.vampire_blood_display.screen_loc = "WEST:6,CENTER-1:15"
 			hud.static_inventory += hud.vampire_blood_display
 			hud.show_hud(hud.hud_version)
-		hud.vampire_blood_display.maptext = "<div align='center' valign='middle' style='position:relative; top:0px; left:6px'><font color='#dd66dd'>[bloodusable]</font></div>"
+		hud.vampire_blood_display.maptext = "<div align='center' valign='middle' style='position:relative; top:0px; left:6px'><font color='#ce0202'>[bloodusable]</font></div>"
 	handle_vampire_cloak()
 	if(istype(owner.loc, /turf/space))
 		check_sun()
 	if(istype(owner.loc.loc, /area/chapel) && !get_ability(/datum/vampire_passive/full))
-		vamp_burn(0)
+		vamp_burn(7)
 	nullified = max(0, nullified - 1)
 
 /datum/vampire/proc/handle_vampire_cloak()
@@ -432,8 +452,7 @@ You are weak to holy things and starlight. Don't go into space and avoid the Cha
 	else
 		owner.alpha = round((255 * 0.80))
 
-/datum/vampire/proc/vamp_burn(severe_burn)
-	var/burn_chance = severe_burn ? 35 : 8
+/datum/vampire/proc/vamp_burn(burn_chance)
 	if(prob(burn_chance) && owner.health >= 50)
 		switch(owner.health)
 			if(75 to 100)

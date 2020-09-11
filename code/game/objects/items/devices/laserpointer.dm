@@ -81,7 +81,7 @@
 		return
 	if(ishuman(user))
 		var/mob/living/carbon/human/H = user
-		if((HULK in H.mutations) || (NOGUNS in H.species.species_traits))
+		if((HULK in H.mutations) || (NOGUNS in H.dna.species.species_traits))
 			user << "<span class='warning'>Your fingers can't press the button!</span>"
 			return
 
@@ -98,7 +98,7 @@
 	//human/alien mobs
 	if(iscarbon(target))
 		var/mob/living/carbon/C = target
-		if(user.zone_sel.selecting == "eyes")
+		if(user.zone_selected == "eyes")
 			add_attack_logs(user, C, "Shone a laser in the eyes with [src]")
 
 			var/severity = 1
@@ -138,6 +138,7 @@
 
 			log_admin("[key_name(user)] EMPd a camera with a laser pointer")
 			user.create_attack_log("[key_name(user)] EMPd a camera with a laser pointer")
+			add_attack_logs(user, C, "EMPd with [src]", ATKLOG_ALL)
 		else
 			outmsg = "<span class='info'>You missed the lens of [C] with [src].</span>"
 
@@ -167,7 +168,7 @@
 	if(energy <= max_energy)
 		if(!recharging)
 			recharging = 1
-			processing_objects.Add(src)
+			START_PROCESSING(SSobj, src)
 		if(energy <= 0)
 			to_chat(user, "<span class='warning'>You've overused the battery of [src], now it needs time to recharge!</span>")
 			recharge_locked = 1

@@ -11,6 +11,8 @@
 	icon_state = "deathsquid"
 	icon_living = "deathsquid"
 	icon_dead = "deathsquiddead"
+	pixel_x = -24
+	pixel_y = -24
 
 	attacktext = "slices"
 	attack_sound = 'sound/weapons/bladeslice.ogg'
@@ -27,7 +29,7 @@
 	see_in_dark = 8
 	mob_size = MOB_SIZE_LARGE
 	ventcrawler = 0
-	gold_core_spawnable = CHEM_MOB_SPAWN_INVALID
+	gold_core_spawnable = NO_SPAWN
 
 
 

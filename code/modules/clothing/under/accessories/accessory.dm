@@ -7,9 +7,10 @@
 	item_color = "bluetie"
 	slot_flags = SLOT_TIE
 	w_class = WEIGHT_CLASS_SMALL
-	var/slot = "decor"
+	var/slot = ACCESSORY_SLOT_DECOR
 	var/obj/item/clothing/under/has_suit = null		//the suit the tie may be attached to
 	var/image/inv_overlay = null	//overlay used when attached to clothing.
+	var/allow_duplicates = TRUE // Allow accessories of the same type.
 
 /obj/item/clothing/accessory/New()
 	..()
@@ -36,8 +37,13 @@
 			var/mob/M = has_suit.loc
 			A.Grant(M)
 
-	for(var/armor_type in armor)
-		has_suit.armor[armor_type] += armor[armor_type]
+	if (islist(has_suit.armor) || isnull(has_suit.armor)) 	// This proc can run before /obj/Initialize has run for U and src,
+		has_suit.armor = getArmor(arglist(has_suit.armor))	// we have to check that the armor list has been transformed into a datum before we try to call a proc on it
+															// This is safe to do as /obj/Initialize only handles setting up the datum if actually needed.
+	if (islist(armor) || isnull(armor))
+		armor = getArmor(arglist(armor))
+
+	has_suit.armor = has_suit.armor.attachArmor(armor)
 
 	if(user)
 		to_chat(user, "<span class='notice'>You attach [src] to [has_suit].</span>")
@@ -55,8 +61,7 @@
 			var/mob/M = has_suit.loc
 			A.Remove(M)
 
-	for(var/armor_type in armor)
-		has_suit.armor[armor_type] -= armor[armor_type]
+	has_suit.armor = has_suit.armor.detachArmor(armor)
 
 	has_suit = null
 	if(user)
@@ -117,7 +122,7 @@
 	icon_state = "waistcoat"
 	item_state = "waistcoat"
 	item_color = "waistcoat"
-	species_fit = list("Vox")
+
 	sprite_sheets = list(
 		"Vox" = 'icons/mob/species/vox/suit.dmi'
 		)
@@ -136,7 +141,7 @@
 			user.visible_message("[user] places \the [src] against [M]'s chest and listens attentively.", "You place \the [src] against [M]'s chest...")
 		var/obj/item/organ/internal/H = M.get_int_organ(/obj/item/organ/internal/heart)
 		var/obj/item/organ/internal/L = M.get_int_organ(/obj/item/organ/internal/lungs)
-		if((H && M.pulse) || (L && !(BREATHLESS in M.mutations) && !(NO_BREATHE in M.species.species_traits)))
+		if((H && M.pulse) || (L && !(BREATHLESS in M.mutations) && !(NO_BREATHE in M.dna.species.species_traits)))
 			var/color = "notice"
 			if(H)
 				var/heart_sound
@@ -179,36 +184,9 @@
 	icon_state = "bronze"
 	item_color = "bronze"
 	materials = list(MAT_METAL=1000)
-	burn_state = FIRE_PROOF
+	resistance_flags = FIRE_PROOF
 
-/obj/item/clothing/accessory/medal/conduct
-	name = "distinguished conduct medal"
-	desc = "A bronze medal awarded for distinguished conduct. Whilst a great honor, this is the most basic award given by Nanotrasen. It is often awarded by a captain to a member of his crew."
-
-/obj/item/clothing/accessory/medal/bronze_heart
-	name = "bronze heart medal"
-	desc = "A bronze heart-shaped medal awarded for sacrifice. It is often awarded posthumously or for severe injury in the line of duty."
-	icon_state = "bronze_heart"
-
-/obj/item/clothing/accessory/medal/nobel_science
-	name = "nobel sciences award"
-	desc = "A bronze medal which represents significant contributions to the field of science or engineering."
-
-/obj/item/clothing/accessory/medal/silver
-	name = "silver medal"
-	desc = "A silver medal."
-	icon_state = "silver"
-	item_color = "silver"
-	materials = list(MAT_SILVER=1000)
-
-/obj/item/clothing/accessory/medal/silver/valor
-	name = "medal of valor"
-	desc = "A silver medal awarded for acts of exceptional valor."
-
-/obj/item/clothing/accessory/medal/silver/security
-	name = "robust security award"
-	desc = "An award for distinguished combat and sacrifice in defence of Nanotrasen's commercial interests. Often awarded to security staff."
-
+// GOLD (awarded by centcom)
 /obj/item/clothing/accessory/medal/gold
 	name = "gold medal"
 	desc = "A prestigious golden medal."
@@ -219,10 +197,65 @@
 /obj/item/clothing/accessory/medal/gold/captain
 	name = "medal of captaincy"
 	desc = "A golden medal awarded exclusively to those promoted to the rank of captain. It signifies the codified responsibilities of a captain to Nanotrasen, and their undisputable authority over their crew."
+	resistance_flags = INDESTRUCTIBLE | LAVA_PROOF | FIRE_PROOF | ACID_PROOF
 
 /obj/item/clothing/accessory/medal/gold/heroism
 	name = "medal of exceptional heroism"
-	desc = "An extremely rare golden medal awarded only by CentComm. To recieve such a medal is the highest honor and as such, very few exist. This medal is almost never awarded to anybody but commanders."
+	desc = "An extremely rare golden medal awarded only by CentComm. To recieve such a medal is the highest honor and as such, very few exist."
+
+// SILVER (awarded by Captain)
+
+/obj/item/clothing/accessory/medal/silver
+	name = "silver medal"
+	desc = "A silver medal."
+	icon_state = "silver"
+	item_color = "silver"
+	materials = list(MAT_SILVER=1000)
+
+/obj/item/clothing/accessory/medal/silver/valor
+	name = "medal of valor"
+	desc = "An award issued by Captains to crew members whose exceptional performance and service to the station has been commended by the station's top leadership."
+
+/obj/item/clothing/accessory/medal/silver/leadership
+	name = "medal of command"
+	desc = "An award issued by Captains to heads of department who do an excellent job managing their department. Made of pure silver."
+
+
+// BRONZE (awarded by heads of department, except for the bronze heart)
+
+
+
+/obj/item/clothing/accessory/medal/security
+	name = "robust security medal"
+	desc = "An award issued by the HoS to security staff who excel at upholding the law."
+
+/obj/item/clothing/accessory/medal/science
+	name = "smart science medal"
+	desc = "An award issued by the RD to science staff who advance the frontiers of knowledge."
+
+/obj/item/clothing/accessory/medal/engineering
+	name = "excellent engineering medal"
+	desc = "An award issued by the CE to engineering staff whose dedication keep the station running at its best."
+
+/obj/item/clothing/accessory/medal/service
+	name = "superior service medal"
+	desc = "An award issued by the HoP to service staff who go above and beyond."
+
+/obj/item/clothing/accessory/medal/medical
+	name = "magnificient medical medal"
+	desc = "An award issued by the CMO to medical staff who excel at saving lives."
+
+/obj/item/clothing/accessory/medal/legal
+	name = "meritous legal medal"
+	desc = "An award issued by the Magistrate to legal staff who uphold the rule of law."
+
+/obj/item/clothing/accessory/medal/heart
+	name = "bronze heart medal"
+	desc = "A rarely-awarded medal for those who sacrifice themselves in the line of duty to save their fellow crew."
+	icon_state = "bronze_heart"
+
+
+
 
 /*
 	Holobadges are worn on the belt or neck, and can be used to show that the holder is an authorized
@@ -243,7 +276,6 @@
 /obj/item/clothing/accessory/holobadge/cord
 	icon_state = "holobadge-cord"
 	item_color = "holobadge-cord"
-	slot_flags = SLOT_MASK | SLOT_TIE
 
 /obj/item/clothing/accessory/holobadge/attack_self(mob/user as mob)
 	if(!stored_name)
@@ -263,7 +295,7 @@
 			var/obj/item/pda/pda = O
 			id_card = pda.id
 
-		if(access_security in id_card.access || emagged)
+		if(ACCESS_SECURITY in id_card.access || emagged)
 			to_chat(user, "You imprint your ID details onto the badge.")
 			stored_name = id_card.registered_name
 			name = "holobadge ([stored_name])"
@@ -286,19 +318,35 @@
 	if(isliving(user))
 		user.visible_message("<span class='warning'>[user] invades [M]'s personal space, thrusting [src] into [M.p_their()] face insistently.</span>","<span class='warning'>You invade [M]'s personal space, thrusting [src] into [M.p_their()] face insistently. You are the law.</span>")
 
-/obj/item/storage/box/holobadge
-	name = "holobadge box"
-	desc = "A box claiming to contain holobadges."
-	New()
-		new /obj/item/clothing/accessory/holobadge(src)
-		new /obj/item/clothing/accessory/holobadge(src)
-		new /obj/item/clothing/accessory/holobadge(src)
-		new /obj/item/clothing/accessory/holobadge(src)
-		new /obj/item/clothing/accessory/holobadge/cord(src)
-		new /obj/item/clothing/accessory/holobadge/cord(src)
-		..()
-		return
+//////////////
+//OBJECTION!//
+//////////////
 
+/obj/item/clothing/accessory/lawyers_badge
+	name = "attorney's badge"
+	desc = "Fills you with the conviction of JUSTICE. Lawyers tend to want to show it to everyone they meet."
+	icon_state = "lawyerbadge"
+	item_state = "lawyerbadge"
+	item_color = "lawyerbadge"
+	var/cached_bubble_icon = null
+
+/obj/item/clothing/accessory/lawyers_badge/attack_self(mob/user)
+	if(prob(1))
+		user.say("The testimony contradicts the evidence!")
+	user.visible_message("<span class='notice'>[user] shows [user.p_their()] attorney's badge.</span>", "<span class='notice'>You show your attorney's badge.</span>")
+
+/obj/item/clothing/accessory/lawyers_badge/on_attached(obj/item/clothing/under/S, mob/user)
+	..()
+	if(has_suit && ismob(has_suit.loc))
+		var/mob/M = has_suit.loc
+		cached_bubble_icon = M.bubble_icon
+		M.bubble_icon = "lawyer"
+
+/obj/item/clothing/accessory/lawyers_badge/on_removed(mob/user)
+	if(has_suit && ismob(has_suit.loc))
+		var/mob/M = has_suit.loc
+		M.bubble_icon = cached_bubble_icon
+	..()
 
 ///////////
 //SCARVES//
@@ -307,6 +355,7 @@
 /obj/item/clothing/accessory/scarf // No overlay
 	name = "scarf"
 	desc = "A stylish scarf. The perfect winter accessory for those with a keen fashion sense, and those who just can't handle a cold breeze on their necks."
+	dog_fashion = /datum/dog_fashion/head
 
 /obj/item/clothing/accessory/scarf/red
 	name = "red scarf"
@@ -391,7 +440,32 @@
 	icon_state = "necklace"
 	item_state = "necklace"
 	item_color = "necklace"
-	slot_flags = SLOT_MASK | SLOT_TIE
+	slot_flags = SLOT_TIE
+
+/obj/item/clothing/accessory/necklace/dope
+	name = "gold necklace"
+	desc = "Damn, it feels good to be a gangster."
+	icon_state = "bling"
+	item_state = "bling"
+	item_color = "bling"
+
+/obj/item/clothing/accessory/necklace/skullcodpiece
+	name = "skull codpiece"
+	desc = "A skull shaped ornament, intended to protect the important things in life."
+	icon_state = "skull"
+	item_state = "skull"
+	item_color = "skull"
+	armor = list("melee" = 5, "bullet" = 5, "laser" = 5, "energy" = 5, "bomb" = 20, "bio" = 20, "rad" = 5, "fire" = 0, "acid" = 25)
+	allow_duplicates = FALSE
+
+/obj/item/clothing/accessory/necklace/talisman
+	name = "bone talisman"
+	desc = "A hunter's talisman, some say the old gods smile on those who wear it."
+	icon_state = "talisman"
+	item_state = "talisman"
+	item_color = "talisman"
+	armor = list("melee" = 5, "bullet" = 5, "laser" = 5, "energy" = 5, "bomb" = 20, "bio" = 20, "rad" = 5, "fire" = 0, "acid" = 25)
+	allow_duplicates = FALSE
 
 /obj/item/clothing/accessory/necklace/locket
 	name = "gold locket"
@@ -399,7 +473,7 @@
 	icon_state = "locket"
 	item_state = "locket"
 	item_color = "locket"
-	slot_flags = SLOT_MASK | SLOT_TIE
+	slot_flags = SLOT_TIE
 	var/base_icon
 	var/open
 	var/obj/item/held //Item inside locket.
@@ -451,7 +525,7 @@
 	icon_state = "cowboyshirt"
 	item_state = "cowboyshirt"
 	item_color = "cowboyshirt"
-	species_fit = list("Vox")
+
 	sprite_sheets = list(
 		"Vox" = 'icons/mob/species/vox/suit.dmi'
 		)
@@ -462,7 +536,7 @@
 	icon_state = "cowboyshirt_s"
 	item_state = "cowboyshirt_s"
 	item_color = "cowboyshirt_s"
-	species_fit = list("Vox")
+
 	sprite_sheets = list(
 		"Vox" = 'icons/mob/species/vox/suit.dmi'
 		)
@@ -473,7 +547,7 @@
 	icon_state = "cowboyshirt_white"
 	item_state = "cowboyshirt_white"
 	item_color = "cowboyshirt_white"
-	species_fit = list("Vox")
+
 	sprite_sheets = list(
 		"Vox" = 'icons/mob/species/vox/suit.dmi'
 		)
@@ -484,7 +558,7 @@
 	icon_state = "cowboyshirt_whites"
 	item_state = "cowboyshirt_whites"
 	item_color = "cowboyshirt_whites"
-	species_fit = list("Vox")
+
 	sprite_sheets = list(
 		"Vox" = 'icons/mob/species/vox/suit.dmi'
 		)
@@ -495,7 +569,7 @@
 	icon_state = "cowboyshirt_pink"
 	item_state = "cowboyshirt_pink"
 	item_color = "cowboyshirt_pink"
-	species_fit = list("Vox")
+
 	sprite_sheets = list(
 		"Vox" = 'icons/mob/species/vox/suit.dmi'
 		)
@@ -506,7 +580,7 @@
 	icon_state = "cowboyshirt_pinks"
 	item_state = "cowboyshirt_pinks"
 	item_color = "cowboyshirt_pinks"
-	species_fit = list("Vox")
+
 	sprite_sheets = list(
 		"Vox" = 'icons/mob/species/vox/suit.dmi'
 		)
@@ -517,7 +591,7 @@
 	icon_state = "cowboyshirt_navy"
 	item_state = "cowboyshirt_navy"
 	item_color = "cowboyshirt_navy"
-	species_fit = list("Vox")
+
 	sprite_sheets = list(
 		"Vox" = 'icons/mob/species/vox/suit.dmi'
 		)
@@ -528,7 +602,7 @@
 	icon_state = "cowboyshirt_navys"
 	item_state = "cowboyshirt_navys"
 	item_color = "cowboyshirt_navys"
-	species_fit = list("Vox")
+
 	sprite_sheets = list(
 		"Vox" = 'icons/mob/species/vox/suit.dmi'
 		)
@@ -539,7 +613,7 @@
 	icon_state = "cowboyshirt_red"
 	item_state = "cowboyshirt_red"
 	item_color = "cowboyshirt_red"
-	species_fit = list("Vox")
+
 	sprite_sheets = list(
 		"Vox" = 'icons/mob/species/vox/suit.dmi'
 		)
@@ -550,7 +624,7 @@
 	icon_state = "cowboyshirt_reds"
 	item_state = "cowboyshirt_reds"
 	item_color = "cowboyshirt_reds"
-	species_fit = list("Vox", "Drask", "Grey")
+
 	sprite_sheets = list(
 		"Vox" = 'icons/mob/species/vox/suit.dmi',
 		"Drask" = 'icons/mob/species/drask/suit.dmi',
@@ -589,7 +663,7 @@
 
 /obj/item/clothing/accessory/petcollar/Destroy()
 	QDEL_NULL(access_id)
-	processing_objects -= src
+	STOP_PROCESSING(SSobj, src)
 	return ..()
 
 /obj/item/clothing/accessory/petcollar/attack_self(mob/user as mob)
@@ -626,32 +700,32 @@
 	return access_id ? access_id.GetAccess() : ..()
 
 /obj/item/clothing/accessory/petcollar/examine(mob/user)
-	..()
+	. = ..()
 	if(access_id)
-		to_chat(user, "There is [bicon(access_id)] \a [access_id] clipped onto it.")
+		. += "There is [bicon(access_id)] \a [access_id] clipped onto it."
 
 /obj/item/clothing/accessory/petcollar/equipped(mob/living/simple_animal/user)
 	if(istype(user))
-		processing_objects |= src
+		START_PROCESSING(SSobj, src)
 
 /obj/item/clothing/accessory/petcollar/dropped(mob/living/simple_animal/user)
-	processing_objects -= src
+	STOP_PROCESSING(SSobj, src)
 
 /obj/item/clothing/accessory/petcollar/process()
 	var/mob/living/simple_animal/M = loc
 	// if it wasn't intentionally unequipped but isn't being worn, possibly gibbed
-	if(istype(M) && src == M.collar && M.stat != DEAD)
+	if(istype(M) && src == M.pcollar && M.stat != DEAD)
 		return
 
 	var/area/t = get_area(M)
 	var/obj/item/radio/headset/a = new /obj/item/radio/headset(src)
-	if(istype(t, /area/syndicate_station) || istype(t, /area/syndicate_mothership) || istype(t, /area/shuttle/syndicate_elite) )
+	if(istype(t, /area/syndicate_mothership) || istype(t, /area/shuttle/syndicate_elite))
 		//give the syndicats a bit of stealth
 		a.autosay("[M] has been vandalized in Space!", "[M]'s Death Alarm")
 	else
 		a.autosay("[M] has been vandalized in [t.name]!", "[M]'s Death Alarm")
 	qdel(a)
-	processing_objects -= src
+	STOP_PROCESSING(SSobj, src)
 
 /proc/english_accessory_list(obj/item/clothing/under/U)
 	if(!istype(U) || !U.accessories.len)

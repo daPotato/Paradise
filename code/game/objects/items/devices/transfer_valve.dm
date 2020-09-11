@@ -64,7 +64,7 @@
 		A.toggle_secure()	//this calls update_icon(), which calls update_icon() on the holder (i.e. the bomb).
 
 		investigate_log("[key_name(user)] attached a [A] to a transfer valve.", INVESTIGATE_BOMB)
-		msg_admin_attack("[key_name_admin(user)]attached [A] to a transfer valve.")
+		msg_admin_attack("[key_name_admin(user)]attached [A] to a transfer valve.", ATKLOG_FEW)
 		log_game("[key_name_admin(user)] attached [A] to a transfer valve.")
 		attacher = user
 		SSnanoui.update_uis(src) // update all UIs attached to src
@@ -75,10 +75,10 @@
 		return
 	attached_device.HasProximity(AM)
 
-/obj/item/transfer_valve/hear_talk(mob/living/M, msg)
+/obj/item/transfer_valve/hear_talk(mob/living/M, list/message_pieces)
 	..()
 	for(var/obj/O in contents)
-		O.hear_talk(M, msg)
+		O.hear_talk(M, message_pieces)
 
 /obj/item/transfer_valve/hear_message(mob/living/M, msg)
 	..()
@@ -100,7 +100,7 @@
 		// auto update every Master Controller tick
 		//ui.set_auto_update(1)
 
-/obj/item/transfer_valve/ui_data(mob/user, ui_key = "main", datum/topic_state/state = default_state)
+/obj/item/transfer_valve/ui_data(mob/user, ui_key = "main", datum/topic_state/state = GLOB.default_state)
 	var/data[0]
 
 	data["attachmentOne"] = tank_one ? tank_one.name : null

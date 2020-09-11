@@ -26,7 +26,7 @@
 	..()
 
 /obj/item/melee/cultblade/pickup(mob/living/user)
-	..()
+	. = ..()
 	if(!iscultist(user))
 		to_chat(user, "<span class='cultlarge'>\"I wouldn't advise that.\"</span>")
 		to_chat(user, "<span class='warning'>An overwhelming sense of nausea overpowers you!</span>")
@@ -34,7 +34,7 @@
 
 	if(HULK in user.mutations)
 		to_chat(user, "<span class='danger'>You can't seem to hold the blade properly!</span>")
-		user.unEquip(src, 1)
+		return FALSE
 
 /obj/item/melee/cultblade/dagger
 	name = "sacrificial dagger"
@@ -50,7 +50,7 @@
 	..()
 	if(ishuman(target))
 		var/mob/living/carbon/human/H = target
-		if((H.stat != DEAD) && !(NO_BLOOD in H.species.species_traits))
+		if((H.stat != DEAD) && !(NO_BLOOD in H.dna.species.species_traits))
 			H.bleed(50)
 
 /obj/item/restraints/legcuffs/bola/cult
@@ -61,18 +61,18 @@
 	breakouttime = 45
 	weaken = 1
 
-/obj/item/clothing/head/culthood
+/obj/item/clothing/head/hooded/culthood
 	name = "cult hood"
 	icon_state = "culthood"
 	desc = "A hood worn by the followers of a cult."
 	flags_inv = HIDEFACE
 	flags_cover = HEADCOVERSEYES
-	armor = list(melee = 30, bullet = 10, laser = 5, energy = 5, bomb = 0, bio = 0, rad = 0)
+	armor = list(melee = 30, bullet = 10, laser = 5, energy = 5, bomb = 0, bio = 0, rad = 0, fire = 10, acid = 10)
 	cold_protection = HEAD
 	min_cold_protection_temperature = SPACE_HELM_MIN_TEMP_PROTECT
 
 
-/obj/item/clothing/head/culthood/alt
+/obj/item/clothing/head/hooded/culthood/alt
 	icon_state = "cult_hoodalt"
 	item_state = "cult_hoodalt"
 
@@ -83,15 +83,15 @@
 	icon_state = "cultrobes"
 	item_state = "cultrobes"
 	body_parts_covered = UPPER_TORSO|LOWER_TORSO|LEGS|ARMS
-	hoodtype = /obj/item/clothing/head/culthood
+	hoodtype = /obj/item/clothing/head/hooded/culthood
 	allowed = list(/obj/item/tome,/obj/item/melee/cultblade)
-	armor = list(melee = 50, bullet = 30, laser = 50, energy = 20, bomb = 25, bio = 10, rad = 0)
+	armor = list("melee" = 40, "bullet" = 30, "laser" = 40, "energy" = 20, "bomb" = 25, "bio" = 10, "rad" = 0, "fire" = 10, "acid" = 10)
 	flags_inv = HIDEJUMPSUIT
 
 /obj/item/clothing/suit/hooded/cultrobes/alt
 	icon_state = "cultrobesalt"
 	item_state = "cultrobesalt"
-	hoodtype = /obj/item/clothing/head/culthood/alt
+	hoodtype = /obj/item/clothing/head/hooded/culthood/alt
 
 /obj/item/clothing/head/magus
 	name = "magus helm"
@@ -101,16 +101,16 @@
 	flags = BLOCKHAIR
 	flags_inv = HIDEFACE
 	flags_cover = HEADCOVERSEYES | HEADCOVERSMOUTH
-	armor = list(melee = 30, bullet = 30, laser = 30, energy = 20, bomb = 0, bio = 0, rad = 0)
+	armor = list("melee" = 50, "bullet" = 30, "laser" = 50, "energy" = 20, "bomb" = 25, "bio" = 10, "rad" = 0, "fire" = 10, "acid" = 10)
 
 /obj/item/clothing/suit/magusred
 	name = "magus robes"
-	desc = "A set of armored robes worn by the followers of Nar-Sie"
+	desc = "A set of armored robes worn by the followers of Nar-Sie."
 	icon_state = "magusred"
 	item_state = "magusred"
 	body_parts_covered = UPPER_TORSO|LOWER_TORSO|LEGS|ARMS
 	allowed = list(/obj/item/tome,/obj/item/melee/cultblade)
-	armor = list(melee = 50, bullet = 30, laser = 50, energy = 20, bomb = 25, bio = 10, rad = 0)
+	armor = list("melee" = 50, "bullet" = 30, "laser" = 50, "energy" = 20, "bomb" = 25, "bio" = 10, "rad" = 0, "fire" = 10, "acid" = 10)
 	flags_inv = HIDEGLOVES|HIDESHOES|HIDEJUMPSUIT
 
 /obj/item/clothing/head/helmet/space/cult
@@ -118,7 +118,7 @@
 	desc = "A space worthy helmet used by the followers of a cult."
 	icon_state = "cult_helmet"
 	item_state = "cult_helmet"
-	armor = list(melee = 60, bullet = 50, laser = 30, energy = 15, bomb = 30, bio = 30, rad = 30)
+	armor = list("melee" = 70, "bullet" = 50, "laser" = 30,"energy" = 15, "bomb" = 30, "bio" = 30, "rad" = 30, "fire" = 40, "acid" = 75)
 
 /obj/item/clothing/suit/space/cult
 	name = "cult armor"
@@ -128,27 +128,27 @@
 	w_class = WEIGHT_CLASS_NORMAL
 	allowed = list(/obj/item/tome,/obj/item/melee/cultblade,/obj/item/tank)
 	slowdown = 1
-	armor = list(melee = 60, bullet = 50, laser = 30, energy = 15, bomb = 30, bio = 30, rad = 30)
+	armor = list("melee" = 70, "bullet" = 50, "laser" = 30,"energy" = 15, "bomb" = 30, "bio" = 30, "rad" = 30, "fire" = 40, "acid" = 75)
 
 /obj/item/clothing/suit/hooded/cultrobes/cult_shield
 	name = "empowered cultist robe"
-	desc = "Empowered garb which creates a powerful shield around the user."
+	desc = "An empowered garb which creates a powerful shield around the user."
 	icon_state = "cult_armour"
 	item_state = "cult_armour"
 	w_class = WEIGHT_CLASS_BULKY
-	armor = list(melee = 50, bullet = 40, laser = 50, energy = 30, bomb = 50, bio = 30, rad = 30)
+	armor = list("melee" = 50, "bullet" = 40, "laser" = 50, "energy" = 30, "bomb" = 50, "bio" = 30, "rad" = 30, "fire" = 50, "acid" = 60)
 	body_parts_covered = UPPER_TORSO|LOWER_TORSO|LEGS|ARMS
 	allowed = list(/obj/item/tome,/obj/item/melee/cultblade)
 	var/current_charges = 3
-	hoodtype = /obj/item/clothing/head/cult_hoodie
+	var/shield_state = "shield-cult"
+	hoodtype = /obj/item/clothing/head/hooded/cult_hoodie
 
-/obj/item/clothing/head/cult_hoodie
+/obj/item/clothing/head/hooded/cult_hoodie
 	name = "empowered cultist robe"
-	desc = "Empowered garb which creates a powerful shield around the user."
+	desc = "An empowered garb which creates a powerful shield around the user."
 	icon_state = "cult_hoodalt"
-	armor = list(melee = 50, bullet = 40, laser = 50, energy = 30, bomb = 50, bio = 30, rad = 30)
+	armor = list("melee" = 40, "bullet" = 30, "laser" = 40,"energy" = 20, "bomb" = 25, "bio" = 10, "rad" = 0, "fire" = 10, "acid" = 10)
 	body_parts_covered = HEAD
-	flags = NODROP
 	flags_inv = HIDEFACE
 	flags_cover = HEADCOVERSEYES
 
@@ -161,37 +161,53 @@
 		user.Dizzy(30)
 		user.Weaken(5)
 
-/obj/item/clothing/suit/hooded/cultrobes/cult_shield/hit_reaction(mob/living/carbon/human/owner, attack_text, isinhands)
+/obj/item/clothing/suit/hooded/cultrobes/cult_shield/hit_reaction(mob/living/carbon/human/owner, atom/movable/hitby, attack_text = "the attack", final_block_chance = 0, damage = 0, attack_type = MELEE_ATTACK)
 	if(current_charges)
 		owner.visible_message("<span class='danger'>\The [attack_text] is deflected in a burst of blood-red sparks!</span>")
 		current_charges--
+		playsound(loc, "sparks", 100, 1)
 		new /obj/effect/temp_visual/cult/sparks(get_turf(owner))
 		if(!current_charges)
 			owner.visible_message("<span class='danger'>The runed shield around [owner] suddenly disappears!</span>")
+			shield_state = "broken"
 			owner.update_inv_wear_suit()
 		return 1
 	return 0
 
-/obj/item/clothing/suit/hooded/cultrobes/berserker
+/obj/item/clothing/suit/hooded/cultrobes/cult_shield/special_overlays()
+	return mutable_appearance('icons/effects/cult_effects.dmi', shield_state, MOB_LAYER + 0.01)
+
+/obj/item/clothing/suit/hooded/cultrobes/flagellant_robe
 	name = "flagellant's robes"
 	desc = "Blood-soaked robes infused with dark magic; allows the user to move at inhuman speeds, but at the cost of increased damage."
-	icon_state = "hardsuit-berserker"
-	item_state = "hardsuit-berserker"
+	icon_state = "flagellantrobe"
+	item_state = "flagellantrobe"
 	flags_inv = HIDEJUMPSUIT
 	allowed = list(/obj/item/tome,/obj/item/melee/cultblade)
 	body_parts_covered = UPPER_TORSO|LOWER_TORSO|LEGS|ARMS
-	armor = list(melee = -50, bullet = -50, laser = -100, energy = -50, bomb = -50, bio = -50, rad = -50)
+	armor = list("melee" = -45, "bullet" = -45, "laser" = -45,"energy" = -45, "bomb" = -45, "bio" = -45, "rad" = -45, "fire" = 0, "acid" = 0)
 	slowdown = -1
-	hoodtype = /obj/item/clothing/head/berserkerhood
+	sprite_sheets = list(
+		"Vox" = 'icons/mob/species/vox/suit.dmi',
+		"Drask" = 'icons/mob/species/drask/suit.dmi',
+		"Grey" = 'icons/mob/species/grey/suit.dmi'
+	)
+	hoodtype = /obj/item/clothing/head/hooded/flagellant_hood
 
 
-/obj/item/clothing/head/berserkerhood
+/obj/item/clothing/head/hooded/flagellant_hood
 	name = "flagellant's robes"
 	desc = "Blood-soaked garb infused with dark magic; allows the user to move at inhuman speeds, but at the cost of increased damage."
-	icon_state = "culthood"
+	icon_state = "flagellanthood"
+	item_state = "flagellanthood"
 	flags_inv = HIDEFACE
 	flags_cover = HEADCOVERSEYES
-	armor = list(melee = -100, bullet = -100, laser = -100, energy = -100, bomb = -100, bio = -100, rad = -100)
+	armor = list("melee" = 0, "bullet" = 0, "laser" = 0, "energy" = 0, "bomb" = 0, "bio" = 0, "rad" = 0, "fire" = 0, "acid" = 0)
+	sprite_sheets = list(
+		"Vox" = 'icons/mob/species/vox/head.dmi',
+		"Drask" = 'icons/mob/species/drask/head.dmi',
+		"Grey" = 'icons/mob/species/grey/head.dmi'
+	)
 
 /obj/item/whetstone/cult
 	name = "eldritch whetstone"
@@ -201,6 +217,7 @@
 	increment = 5
 	max = 40
 	prefix = "darkened"
+	claw_damage_increase = 4
 
 /obj/item/whetstone/cult/update_icon()
 	icon_state = "cult_sharpener[used ? "_used" : ""]"
@@ -213,11 +230,11 @@
 	list_reagents = list("unholywater" = 40)
 
 /obj/item/clothing/glasses/night/cultblind
-	desc = "May the master guide you through the darkness and shield you from the light."
 	name = "zealot's blindfold"
+	desc = "May the master guide you through the darkness and shield you from the light."
 	icon_state = "blindfold"
 	item_state = "blindfold"
-	darkness_view = 8
+	see_in_dark = 8
 	flash_protect = 1
 
 /obj/item/clothing/glasses/night/cultblind/equipped(mob/user, slot)
@@ -246,16 +263,17 @@
 	if(curselimit > 1)
 		to_chat(user, "<span class='notice'>We have exhausted our ability to curse the shuttle.</span>")
 		return
-	if(locate(/obj/singularity/narsie) in poi_list || locate(/mob/living/simple_animal/slaughter/cult) in mob_list)
-		to_chat(user, "<span class='warning'>Nar-Sie or his avatars are already on this plane, there is no delaying the end of all things.</span>")
+	if(locate(/obj/singularity/narsie) in GLOB.poi_list || locate(/mob/living/simple_animal/slaughter/cult) in GLOB.mob_list)
+		to_chat(user, "<span class='warning'>Nar-Sie or her avatars are already on this plane, there is no delaying the end of all things.</span>")
 		return
 
-	if(shuttle_master.emergency.mode == SHUTTLE_CALL)
+	if(SSshuttle.emergency.mode == SHUTTLE_CALL)
 		var/cursetime = 1800
-		var/timer = shuttle_master.emergency.timeLeft(1) + cursetime
-		shuttle_master.emergency.setTimer(timer)
+		var/timer = SSshuttle.emergency.timeLeft(1) + cursetime
+		SSshuttle.emergency.setTimer(timer)
 		to_chat(user,"<span class='danger'>You shatter the orb! A dark essence spirals into the air, then disappears.</span>")
-		playsound(user.loc, 'sound/effects/Glassbr1.ogg', 50, 1)
+		playsound(user.loc, 'sound/effects/glassbr1.ogg', 50, 1)
+		curselimit++
 		qdel(src)
 		sleep(20)
 		var/global/list/curses
@@ -268,12 +286,11 @@
 			"The shuttle dispatcher was found dead with bloody symbols carved into their flesh. The shuttle will be delayed by two minutes.",
 			"Steve repeatedly touched a lightbulb until his hands fell off. The shuttle will be delayed by two minutes.")
 		var/message = pick(curses)
-		command_announcement.Announce("[message]", "System Failure", 'sound/misc/notice1.ogg')
-		curselimit++
+		GLOB.command_announcement.Announce("[message]", "System Failure", 'sound/misc/notice1.ogg')
 
 /obj/item/cult_shift
 	name = "veil shifter"
-	desc = "This relic teleports you forward a medium distance."
+	desc = "This relic teleports you forward by a medium distance."
 	icon = 'icons/obj/cult.dmi'
 	icon_state ="shifter"
 	var/uses = 4
@@ -281,9 +298,9 @@
 /obj/item/cult_shift/examine(mob/user)
 	. = ..()
 	if(uses)
-		to_chat(user, "<span class='cult'>It has [uses] uses remaining.</span>")
+		. += "<span class='cult'>It has [uses] uses remaining.</span>"
 	else
-		to_chat(user, "<span class='cult'>It seems drained.</span>")
+		. += "<span class='cult'>It seems drained.</span>"
 
 /obj/item/cult_shift/proc/handle_teleport_grab(turf/T, mob/user)
 	var/mob/living/carbon/C = user
@@ -298,7 +315,7 @@
 		return
 	if(!iscultist(user))
 		user.unEquip(src, 1)
-		step(src, pick(alldirs))
+		step(src, pick(GLOB.alldirs))
 		to_chat(user, "<span class='warning'>\The [src] flickers out of your hands, too eager to move!</span>")
 		return
 
@@ -343,31 +360,26 @@
 	else
 		to_chat(C, "<span class='danger'>The veil cannot be torn here!</span>")
 
-/obj/item/clothing/suit/space/eva/plasmaman/cultist
-	name = "plasmaman cultist armor"
-	icon_state = "plasmaman_cult"
-	item_state = "plasmaman_cult"
-	desc = "A bulky suit of armour, menacing with red energy. It looks like it would fit a plasmaman."
-	slowdown = 1
-	armor = list(melee = 60, bullet = 50, laser = 30,energy = 15, bomb = 30, bio = 30, rad = 30)
-
-/obj/item/clothing/head/helmet/space/eva/plasmaman/cultist
-	name = "plasmaman cultist helmet"
-	icon_state = "plasmamanCult_helmet0"
-	base_state = "plasmamanCult_helmet"
-	desc = "A helmet designed by cultists. It glows menacingly with unearthly flames."
-	armor = list(melee = 60, bullet = 50, laser = 30,energy = 15, bomb = 30, bio = 30, rad = 30)
-
 /obj/item/melee/cultblade/ghost
 	name = "eldritch sword"
 	force = 15
 	flags = NODROP | DROPDEL
 
-/obj/item/clothing/head/culthood/alt/ghost
+/obj/item/clothing/head/hooded/culthood/alt/ghost
 	flags = NODROP | DROPDEL
 
-/obj/item/clothing/suit/cultrobes/alt/ghost
+/obj/item/clothing/suit/cultrobesghost
+	name = "ghostly cult robes"
+	desc = "A set of ethereal armored robes worn by the undead followers of a cult."
+	icon_state = "cultrobesalt"
+	item_state = "cultrobesalt"
+	body_parts_covered = UPPER_TORSO|LOWER_TORSO|LEGS|ARMS
+	allowed = list(/obj/item/tome,/obj/item/melee/cultblade)
+	armor = list(melee = 50, bullet = 30, laser = 50, energy = 20, bomb = 25, bio = 10, rad = 0, fire = 10, acid = 10)
+	flags_inv = HIDEJUMPSUIT
+
 	flags = NODROP | DROPDEL
+
 
 /obj/item/clothing/shoes/cult/ghost
 	flags = NODROP | DROPDEL
@@ -376,7 +388,7 @@
 	name = "Cultist Ghost"
 
 	uniform = /obj/item/clothing/under/color/black
-	suit = /obj/item/clothing/suit/cultrobes/alt/ghost
+	suit = /obj/item/clothing/suit/cultrobesghost
 	shoes = /obj/item/clothing/shoes/cult/ghost
-	head = /obj/item/clothing/head/culthood/alt/ghost
+	head = /obj/item/clothing/head/hooded/culthood/alt/ghost
 	r_hand = /obj/item/melee/cultblade/ghost

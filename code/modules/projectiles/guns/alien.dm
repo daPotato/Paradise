@@ -11,14 +11,14 @@
 	can_suppress = 0
 	var/charge_tick = 0
 	var/charge_delay = 15
-	restricted_species = list("Vox", "Vox Armalis")
+	restricted_species = list(/datum/species/vox)
 
 /obj/item/gun/projectile/automatic/spikethrower/New()
 	..()
-	processing_objects.Add(src)
+	START_PROCESSING(SSobj, src)
 
 /obj/item/gun/projectile/automatic/spikethrower/Destroy()
-	processing_objects.Remove(src)
+	STOP_PROCESSING(SSobj, src)
 	return ..()
 
 /obj/item/gun/projectile/automatic/spikethrower/update_icon()
@@ -79,7 +79,8 @@
 	force = 10
 	ammo_type = list(/obj/item/ammo_casing/energy/sonic)
 	cell_type = /obj/item/stock_parts/cell/super
-	restricted_species = list("Vox Armalis")
+	restricted_species = list(/datum/species/vox/armalis)
+	sprite_sheets_inhand = list("Vox Armalis" = 'icons/mob/species/armalis/held.dmi') //Big guns big birds.
 
 /obj/item/gun/energy/noisecannon/update_icon()
 	return

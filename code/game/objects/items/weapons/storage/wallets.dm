@@ -5,7 +5,7 @@
 	icon = 'icons/obj/wallets.dmi'
 	icon_state = "wallet"
 	w_class = WEIGHT_CLASS_SMALL
-	burn_state = FLAMMABLE
+	resistance_flags = FLAMMABLE
 	can_hold = list(
 		/obj/item/stack/spacecash,
 		/obj/item/card,
@@ -49,9 +49,6 @@
 
 	if(front_id)
 		switch(front_id.icon_state)
-			if("id")
-				icon_state = "walletid"
-				return
 			if("silver")
 				icon_state = "walletid_silver"
 				return
@@ -60,6 +57,9 @@
 				return
 			if("centcom")
 				icon_state = "walletid_centcom"
+				return
+			else
+				icon_state = "walletid"
 				return
 	icon_state = "wallet"
 
@@ -124,9 +124,6 @@
 /obj/item/storage/wallet/color/update_icon()
 	if(front_id)
 		switch(front_id.icon_state)
-			if("id")
-				icon_state = "[item_color]_walletid"
-				return
 			if("silver")
 				icon_state = "[item_color]_walletid_silver"
 				return
@@ -135,6 +132,9 @@
 				return
 			if("centcom")
 				icon_state = "[item_color]_walletid_centcom"
+				return
+			else
+				icon_state = "[item_color]_walletid"
 				return
 	icon_state = "[item_color]_wallet"
 

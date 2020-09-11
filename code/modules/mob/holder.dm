@@ -7,10 +7,10 @@
 
 /obj/item/holder/New()
 	..()
-	processing_objects.Add(src)
+	START_PROCESSING(SSobj, src)
 
 /obj/item/holder/Destroy()
-	processing_objects.Remove(src)
+	STOP_PROCESSING(SSobj, src)
 	return ..()
 
 /obj/item/holder/process()
@@ -22,7 +22,6 @@
 			var/atom/movable/mob_container
 			mob_container = M
 			mob_container.forceMove(get_turf(src))
-			M.reset_perspective()
 
 		qdel(src)
 

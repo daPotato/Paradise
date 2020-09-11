@@ -1,4 +1,4 @@
-var/obj/machinery/gateway/centerstation/the_gateway = null
+GLOBAL_DATUM_INIT(the_gateway, /obj/machinery/gateway/centerstation, null)
 /obj/machinery/gateway
 	name = "gateway"
 	desc = "A mysterious gateway built by unknown hands, it allows for faster than light travel to far-flung locations."
@@ -6,7 +6,7 @@ var/obj/machinery/gateway/centerstation/the_gateway = null
 	icon_state = "off"
 	density = 1
 	anchored = 1
-	unacidable = 1
+	resistance_flags = INDESTRUCTIBLE | LAVA_PROOF | FIRE_PROOF | UNACIDABLE | ACID_PROOF
 	var/active = 0
 
 /obj/machinery/gateway/Initialize()
@@ -31,7 +31,7 @@ var/obj/machinery/gateway/centerstation/the_gateway = null
 /obj/machinery/gateway/centerstation
 	density = 1
 	icon_state = "offcenter"
-	use_power = 1
+	use_power = IDLE_POWER_USE
 
 	//warping vars
 	var/list/linked = list()
@@ -41,21 +41,21 @@ var/obj/machinery/gateway/centerstation/the_gateway = null
 
 /obj/machinery/gateway/centerstation/New()
 	..()
-	if(!the_gateway)
-		the_gateway = src
+	if(!GLOB.the_gateway)
+		GLOB.the_gateway = src
 
 /obj/machinery/gateway/centerstation/Initialize()
 	..()
 	update_icon()
 	wait = world.time + config.gateway_delay	//+ thirty minutes default
-	awaygate = locate(/obj/machinery/gateway/centeraway) in world
+	awaygate = locate(/obj/machinery/gateway/centeraway) in GLOB.machines
 
 /obj/machinery/gateway/centerstation/update_density_from_dir()
 	return
 
 /obj/machinery/gateway/centerstation/Destroy()
-	if(the_gateway == src)
-		the_gateway = null
+	if(GLOB.the_gateway == src)
+		GLOB.the_gateway = null
 	return ..()
 
 /obj/machinery/gateway/centerstation/update_icon()
@@ -79,7 +79,7 @@ var/obj/machinery/gateway/centerstation/the_gateway = null
 	linked = list()	//clear the list
 	var/turf/T = loc
 
-	for(var/i in alldirs)
+	for(var/i in GLOB.alldirs)
 		T = get_step(loc, i)
 		var/obj/machinery/gateway/G = locate(/obj/machinery/gateway) in T
 		if(G)
@@ -96,11 +96,14 @@ var/obj/machinery/gateway/centerstation/the_gateway = null
 
 
 /obj/machinery/gateway/centerstation/proc/toggleon(mob/user as mob)
-	if(!ready)			return
-	if(linked.len != 8)	return
-	if(!powered())		return
+	if(!ready)
+		return
+	if(linked.len != 8)
+		return
+	if(!powered())
+		return
 	if(!awaygate)
-		awaygate = locate(/obj/machinery/gateway/centeraway) in world
+		awaygate = locate(/obj/machinery/gateway/centeraway) in GLOB.machines
 		if(!awaygate)
 			to_chat(user, "<span class='notice'>Error: No destination found.</span>")
 			return
@@ -135,16 +138,19 @@ var/obj/machinery/gateway/centerstation/the_gateway = null
 
 //okay, here's the good teleporting stuff
 /obj/machinery/gateway/centerstation/Bumped(atom/movable/M as mob|obj)
-	if(!ready)		return
-	if(!active)		return
-	if(!awaygate)	return
+	if(!ready)
+		return
+	if(!active)
+		return
+	if(!awaygate)
+		return
 
 	if(awaygate.calibrated)
 		M.forceMove(get_step(awaygate.loc, SOUTH))
 		M.dir = SOUTH
 		return
 	else
-		var/obj/effect/landmark/dest = pick(awaydestinations)
+		var/obj/effect/landmark/dest = pick(GLOB.awaydestinations)
 		if(dest)
 			M.forceMove(dest.loc)
 			M.dir = SOUTH
@@ -156,6 +162,7 @@ var/obj/machinery/gateway/centerstation/the_gateway = null
 	if(istype(W,/obj/item/multitool))
 		to_chat(user, "The gate is already calibrated, there is no work for you to do here.")
 		return
+	return ..()
 
 /////////////////////////////////////Away////////////////////////
 
@@ -163,7 +170,7 @@ var/obj/machinery/gateway/centerstation/the_gateway = null
 /obj/machinery/gateway/centeraway
 	density = 1
 	icon_state = "offcenter"
-	use_power = 0
+	use_power = NO_POWER_USE
 	var/calibrated = 1
 	var/list/linked = list()	//a list of the connected gateway chunks
 	var/ready = 0
@@ -173,7 +180,7 @@ var/obj/machinery/gateway/centerstation/the_gateway = null
 /obj/machinery/gateway/centeraway/Initialize()
 	..()
 	update_icon()
-	stationgate = locate(/obj/machinery/gateway/centerstation) in world
+	stationgate = locate(/obj/machinery/gateway/centerstation) in GLOB.machines
 
 
 /obj/machinery/gateway/centeraway/update_density_from_dir()
@@ -190,7 +197,7 @@ var/obj/machinery/gateway/centerstation/the_gateway = null
 	linked = list()	//clear the list
 	var/turf/T = loc
 
-	for(var/i in alldirs)
+	for(var/i in GLOB.alldirs)
 		T = get_step(loc, i)
 		var/obj/machinery/gateway/G = locate(/obj/machinery/gateway) in T
 		if(G)
@@ -207,10 +214,12 @@ var/obj/machinery/gateway/centerstation/the_gateway = null
 
 
 /obj/machinery/gateway/centeraway/proc/toggleon(mob/user as mob)
-	if(!ready)			return
-	if(linked.len != 8)	return
+	if(!ready)
+		return
+	if(linked.len != 8)
+		return
 	if(!stationgate)
-		stationgate = locate(/obj/machinery/gateway/centerstation) in world
+		stationgate = locate(/obj/machinery/gateway/centerstation) in GLOB.machines
 		if(!stationgate)
 			to_chat(user, "<span class='notice'>Error: No destination found.</span>")
 			return
@@ -240,16 +249,32 @@ var/obj/machinery/gateway/centerstation/the_gateway = null
 	toggleoff()
 
 
-/obj/machinery/gateway/centeraway/Bumped(atom/movable/M as mob|obj)
-	if(!ready)	return
-	if(!active)	return
-	if(istype(M, /mob/living/carbon))
-		if(exilecheck(M)) return
-	if(istype(M, /obj))
-		for(var/mob/living/carbon/F in M)
-			if(exilecheck(F)) return
-	M.forceMove(get_step(stationgate.loc, SOUTH))
-	M.dir = SOUTH
+/obj/machinery/gateway/centeraway/Bumped(atom/movable/AM)
+	if(!ready)
+		return
+	if(!active)
+		return
+	if(!stationgate || QDELETED(stationgate))
+		return
+	if(isliving(AM))
+		if(exilecheck(AM))
+			return
+	else
+		for(var/mob/living/L in AM.contents)
+			if(exilecheck(L))
+				atom_say("Rejecting [AM]: Exile implant detected in contained lifeform.")
+				return
+	if(AM.has_buckled_mobs())
+		for(var/mob/living/L in AM.buckled_mobs)
+			if(exilecheck(L))
+				atom_say("Rejecting [AM]: Exile implant detected in close proximity lifeform.")
+				return
+	AM.forceMove(get_step(stationgate.loc, SOUTH))
+	AM.setDir(SOUTH)
+	if(ismob(AM))
+		var/mob/M = AM
+		if(M.client)
+			M.client.move_delay = max(world.time + 5, M.client.move_delay)
 
 /obj/machinery/gateway/centeraway/proc/exilecheck(var/mob/living/carbon/M)
 	for(var/obj/item/implant/exile/E in M)//Checking that there is an exile implant in the contents
@@ -266,4 +291,5 @@ var/obj/machinery/gateway/centerstation/the_gateway = null
 		else
 			to_chat(user, "<span class='boldnotice'>Recalibration successful!</span><span class='notice'>: This gate's systems have been fine tuned.  Travel to this gate will now be on target.</span>")
 			calibrated = 1
-			return
+		return
+	return ..()

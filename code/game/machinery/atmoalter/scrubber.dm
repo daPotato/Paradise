@@ -12,7 +12,7 @@
 	volume = 750
 
 	var/minrate = 0//probably useless, but whatever
-	var/maxrate = 10 * ONE_ATMOSPHERE / 4
+	var/maxrate = 10 * ONE_ATMOSPHERE
 
 /obj/machinery/portable_atmospherics/scrubber/emp_act(severity)
 	if(stat & (BROKEN|NOPOWER))
@@ -81,17 +81,11 @@
 		filtered_out.carbon_dioxide = removed.carbon_dioxide
 		removed.carbon_dioxide = 0
 
-		if(removed.trace_gases.len>0)
-			for(var/datum/gas/trace_gas in removed.trace_gases)
-				if(istype(trace_gas, /datum/gas/sleeping_agent))
-					removed.trace_gases -= trace_gas
-					filtered_out.trace_gases += trace_gas
+		filtered_out.sleeping_agent = removed.sleeping_agent
+		removed.sleeping_agent = 0
 
-		if(removed.trace_gases.len>0)
-			for(var/datum/gas/trace_gas in removed.trace_gases)
-				if(istype(trace_gas, /datum/gas/oxygen_agent_b))
-					removed.trace_gases -= trace_gas
-					filtered_out.trace_gases += trace_gas
+		filtered_out.agent_b = removed.agent_b
+		removed.agent_b = 0
 
 	//Remix the resulting gases
 		air_contents.merge(filtered_out)
@@ -116,7 +110,7 @@
 	ui_interact(user)
 	return
 
-/obj/machinery/portable_atmospherics/scrubber/ui_interact(mob/user, ui_key = "main", var/datum/nanoui/ui = null, var/force_open = 1, var/datum/topic_state/state = physical_state)
+/obj/machinery/portable_atmospherics/scrubber/ui_interact(mob/user, ui_key = "main", var/datum/nanoui/ui = null, var/force_open = 1, var/datum/topic_state/state = GLOB.physical_state)
 	// update the ui if it exists, returns null if no ui is passed/found
 	ui = SSnanoui.try_update_ui(user, src, ui_key, ui, force_open)
 	if(!ui)
@@ -128,7 +122,7 @@
 		// auto update every Master Controller tick
 		ui.set_auto_update(1)
 
-/obj/machinery/portable_atmospherics/scrubber/ui_data(mob/user, ui_key = "main", datum/topic_state/state = physical_state)
+/obj/machinery/portable_atmospherics/scrubber/ui_data(mob/user, ui_key = "main", datum/topic_state/state = GLOB.physical_state)
 	var/data[0]
 	data["portConnected"] = connected_port ? 1 : 0
 	data["tankPressure"] = round(air_contents.return_pressure() > 0 ? air_contents.return_pressure() : 0)
@@ -158,7 +152,7 @@
 
 	if(href_list["volume_adj"])
 		var/diff = text2num(href_list["volume_adj"])
-		volume_rate = Clamp(volume_rate+diff, minrate, maxrate)
+		volume_rate = clamp(volume_rate+diff, minrate, maxrate)
 
 	src.add_fingerprint(usr)
 
@@ -193,21 +187,23 @@
 		icon_state = "scrubber:0"
 
 /obj/machinery/portable_atmospherics/scrubber/huge/attackby(var/obj/item/W as obj, var/mob/user as mob, params)
-	if(istype(W, /obj/item/wrench))
-		if(stationary)
-			to_chat(user, "<span class='warning'>The bolts are too tight for you to unscrew!</span>")
-			return
-		if(on)
-			to_chat(user, "<span class='warning'>Turn it off first!</span>")
-			return
-
-		anchored = !anchored
-		playsound(loc, W.usesound, 50, 1)
-		to_chat(user, "<span class='notice'>You [anchored ? "wrench" : "unwrench"] \the [src].</span>")
-		return
-
-	else if((istype(W, /obj/item/analyzer)) && get_dist(user, src) <= 1)
+	if((istype(W, /obj/item/analyzer)) && get_dist(user, src) <= 1)
 		atmosanalyzer_scan(air_contents, user)
+		return
+	return ..()
+
+/obj/machinery/portable_atmospherics/scrubber/huge/wrench_act(mob/user, obj/item/I)
+	. = TRUE
+	if(stationary)
+		to_chat(user, "<span class='warning'>The bolts are too tight for you to unscrew!</span>")
+		return
+	if(on)
+		to_chat(user, "<span class='warning'>Turn it off first!</span>")
+		return
+	if(!I.use_tool(src, user, 0, volume = I.tool_volume))
+		return
+	anchored = !anchored
+	to_chat(user, "<span class='notice'>You [anchored ? "wrench" : "unwrench"] [src].</span>")
 
 /obj/machinery/portable_atmospherics/scrubber/huge/stationary
 	name = "Stationary Air Scrubber"

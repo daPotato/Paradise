@@ -64,7 +64,7 @@
 	if(!ui)
 		// the ui does not exist, so we'll create a new() one
         // for a list of parameters and their descriptions see the code docs in \code\modules\nano\nanoui.dm
-		ui = new(user, src, ui_key, "shuttle_manipulator.tmpl", "Shuttle Manipulator", 660, 700, null, null, admin_state)
+		ui = new(user, src, ui_key, "shuttle_manipulator.tmpl", "Shuttle Manipulator", 660, 700, null, null, GLOB.admin_state)
 		// when the ui is first opened this is the data it will use
 		// open the new ui window
 		ui.open()
@@ -80,14 +80,14 @@
 	data["templates_tabs"] = list()
 	data["selected"] = null
 
-	for(var/shuttle_id in shuttle_templates)
-		var/datum/map_template/shuttle/S = shuttle_templates[shuttle_id]
+	for(var/shuttle_id in GLOB.shuttle_templates)
+		var/datum/map_template/shuttle/S = GLOB.shuttle_templates[shuttle_id]
 
 		if(!templates[S.port_id])
 			data["templates_tabs"] += S.port_id
 			// The first found shuttle type will be our default
 			if(!existing_shuttle)
-				existing_shuttle = shuttle_master.getShuttle(S.port_id)
+				existing_shuttle = SSshuttle.getShuttle(S.port_id)
 			templates[S.port_id] = list(
 				"port_id" = S.port_id,
 				"templates" = list()
@@ -111,7 +111,7 @@
 
 	// Status panel
 	data["shuttles"] = list()
-	for(var/i in shuttle_master.mobile)
+	for(var/i in SSshuttle.mobile)
 		var/obj/docking_port/mobile/M = i
 		var/list/L = list()
 		L["name"] = M.name
@@ -138,7 +138,7 @@
 
 	// Preload some common parameters
 	var/shuttle_id = href_list["shuttle_id"]
-	var/datum/map_template/shuttle/S = shuttle_templates[shuttle_id]
+	var/datum/map_template/shuttle/S = GLOB.shuttle_templates[shuttle_id]
 
 
 	if(href_list["selectMenuKey"])
@@ -148,19 +148,19 @@
 	if(href_list["select_template_category"])
 		var/chosen_shuttle_id = href_list["select_template_category"]
 		selected = null
-		existing_shuttle = shuttle_master.getShuttle(chosen_shuttle_id)
+		existing_shuttle = SSshuttle.getShuttle(chosen_shuttle_id)
 		return 1
 
 	if(href_list["select_template"])
 		if(S)
-			existing_shuttle = shuttle_master.getShuttle(S.port_id)
+			existing_shuttle = SSshuttle.getShuttle(S.port_id)
 			selected = S
 			. = TRUE
 
 	if(href_list["jump_to"])
 
 		if(href_list["type"] == "mobile")
-			for(var/i in shuttle_master.mobile)
+			for(var/i in SSshuttle.mobile)
 				var/obj/docking_port/mobile/M = i
 				if(M.id == href_list["id"])
 					user.forceMove(get_turf(M))
@@ -170,7 +170,7 @@
 
 	if(href_list["fast_travel"])
 
-		for(var/i in shuttle_master.mobile)
+		for(var/i in SSshuttle.mobile)
 			var/obj/docking_port/mobile/M = i
 			if(M.id == href_list["id"] && M.timer && M.timeLeft() >= 50)
 				M.setTimer(50)
@@ -192,7 +192,7 @@
 				user.forceMove(get_turf(preview_shuttle))
 
 	if(href_list["load"])
-		if(existing_shuttle == shuttle_master.backup_shuttle)
+		if(existing_shuttle == SSshuttle.backup_shuttle)
 			// TODO make the load button disabled
 			WARNING("The shuttle that the selected shuttle will replace \
 				is the backup shuttle. Backup shuttle is required to be \

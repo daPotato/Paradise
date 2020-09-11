@@ -4,7 +4,7 @@
 	icon_state = "borgcharger0"
 	density = 1
 	anchored = 1.0
-	use_power = 1
+	use_power = IDLE_POWER_USE
 	idle_power_usage = 5
 	active_power_usage = 1000
 	var/mob/occupant = null
@@ -12,6 +12,10 @@
 	var/recharge_speed
 	var/recharge_speed_nutrition
 	var/repairs
+
+/obj/machinery/recharge_station/Destroy()
+	go_out()
+	return ..()
 
 /obj/machinery/recharge_station/New()
 	..()
@@ -63,54 +67,27 @@
 	return 1
 
 /obj/machinery/recharge_station/ex_act(severity)
-	switch(severity)
-		if(1.0)
-			for(var/atom/movable/A as mob|obj in src)
-				A.forceMove(src.loc)
-				A.ex_act(severity)
-			qdel(src)
-			return
-		if(2.0)
-			if(prob(50))
-				for(var/atom/movable/A as mob|obj in src)
-					A.forceMove(src.loc)
-					A.ex_act(severity)
-				qdel(src)
-				return
-		if(3.0)
-			if(prob(25))
-				for(var/atom/movable/A as mob|obj in src)
-					A.forceMove(src.loc)
-					A.ex_act(severity)
-				qdel(src)
-				return
+	if(occupant)
+		occupant.ex_act(severity)
+	..()
 
-/obj/machinery/recharge_station/blob_act()
-	if(prob(50))
-		var/atom/movable/A = occupant
-		go_out()
-		A.blob_act()
-		qdel(src)
+/obj/machinery/recharge_station/handle_atom_del(atom/A)
+	..()
+	if(A == occupant)
+		occupant = null
+		updateUsrDialog()
+		update_icon()
 
 /obj/machinery/recharge_station/narsie_act()
 	go_out()
 	new /obj/effect/gibspawner/generic(get_turf(loc)) //I REPLACE YOUR TECHNOLOGY WITH FLESH!
 	qdel(src)
 
-
-/obj/machinery/recharge_station/attack_animal(var/mob/living/simple_animal/M)//Stop putting hostile mobs in things guise
-	if(M.environment_smash)
-		M.do_attack_animation(src)
-		visible_message("<span class='danger'>[M.name] smashes [src] apart!</span>")
-		go_out()
-		qdel(src)
-	return
-
 /obj/machinery/recharge_station/Bumped(var/mob/AM)
 	move_inside(AM)
 
-/obj/machinery/recharge_station/allow_drop()
-	return 0
+/obj/machinery/recharge_station/AllowDrop()
+	return FALSE
 
 /obj/machinery/recharge_station/relaymove(mob/user as mob)
 	if(user.stat)
@@ -136,18 +113,23 @@
 	else
 		icon_state = "borgcharger0"
 
-/obj/machinery/recharge_station/attackby(obj/item/P as obj, mob/user as mob, params)
-	if(istype(P, /obj/item/screwdriver))
-		if(src.occupant)
-			to_chat(user, "<span class='notice'>The maintenance panel is locked.</span>")
-			return
-		default_deconstruction_screwdriver(user, "borgdecon2", "borgcharger0", P)
+/obj/machinery/recharge_station/attackby(obj/item/I, mob/user, params)
+	if(exchange_parts(user, I))
 		return
 
-	if(exchange_parts(user, P))
-		return
+	else
+		return ..()
 
-	default_deconstruction_crowbar(P)
+/obj/machinery/recharge_station/crowbar_act(mob/user, obj/item/I)
+	if(default_deconstruction_crowbar(user, I))
+		return TRUE
+
+/obj/machinery/recharge_station/screwdriver_act(mob/user, obj/item/I)
+	if(occupant)
+		to_chat(user, "<span class='notice'>The maintenance panel is locked.</span>")
+		return TRUE
+	if(default_deconstruction_screwdriver(user, "borgdecon2", "borgcharger0", I))
+		return TRUE
 
 /obj/machinery/recharge_station/proc/process_occupant()
 	if(src.occupant)
@@ -155,18 +137,15 @@
 			var/mob/living/silicon/robot/R = occupant
 			restock_modules()
 			if(repairs)
-				R.adjustBruteLoss(-(repairs))
-				R.adjustFireLoss(-(repairs))
-				R.updatehealth()
+				R.heal_overall_damage(repairs, repairs)
 			if(R.cell)
 				R.cell.charge = min(R.cell.charge + recharge_speed, R.cell.maxcharge)
 		else if(istype(occupant, /mob/living/carbon/human))
 			var/mob/living/carbon/human/H = occupant
 			if(H.get_int_organ(/obj/item/organ/internal/cell) && H.nutrition < 450)
-				H.nutrition = min(H.nutrition+recharge_speed_nutrition, 450)
-				if(repairs)
-					H.heal_overall_damage(repairs, repairs, 0, 1)
-					H.updatehealth()
+				H.set_nutrition(min(H.nutrition + recharge_speed_nutrition, 450))
+			if(repairs)
+				H.heal_overall_damage(repairs, repairs, TRUE, 0, 1)
 
 /obj/machinery/recharge_station/proc/go_out()
 	if(!occupant)
@@ -174,7 +153,7 @@
 	occupant.forceMove(loc)
 	occupant = null
 	build_icon()
-	use_power = 1
+	use_power = IDLE_POWER_USE
 	return
 
 /obj/machinery/recharge_station/proc/restock_modules()
@@ -198,18 +177,19 @@
 							F.broken = 0
 							F.times_used = 0
 							F.icon_state = "flash"
-					if(istype(O,/obj/item/gun/energy/disabler/cyborg))
-						var/obj/item/gun/energy/disabler/cyborg/D = O
-						if(D.power_supply.charge < D.power_supply.maxcharge)
+					if(istype(O,/obj/item/gun/energy))
+						var/obj/item/gun/energy/D = O
+						if(D.cell.charge < D.cell.maxcharge)
 							var/obj/item/ammo_casing/energy/E = D.ammo_type[D.select]
-							D.power_supply.give(E.e_cost)
+							D.cell.give(E.e_cost)
+							D.on_recharge()
 							D.update_icon()
 						else
 							D.charge_tick = 0
 					if(istype(O,/obj/item/melee/baton))
 						var/obj/item/melee/baton/B = O
-						if(B.bcell)
-							B.bcell.charge = B.bcell.maxcharge
+						if(B.cell)
+							B.cell.charge = B.cell.maxcharge
 					//Service
 					if(istype(O,/obj/item/reagent_containers/food/condiment/enzyme))
 						if(O.reagents.get_reagent_amount("enzyme") < 50)
@@ -220,6 +200,14 @@
 						var/i = 1
 						for(1, i <= coeff, i++)
 							LR.Charge(occupant)
+					//Fire extinguisher
+					if(istype(O, /obj/item/extinguisher))
+						var/obj/item/extinguisher/ext = O
+						ext.reagents.check_and_add("water", ext.max_water, 5 * coeff)
+					//Welding tools
+					if(istype(O, /obj/item/weldingtool))
+						var/obj/item/weldingtool/weld = O
+						weld.reagents.check_and_add("fuel", weld.maximum_fuel, 2 * coeff)
 				if(R)
 					if(R.module)
 						R.module.respawn_consumable(R)

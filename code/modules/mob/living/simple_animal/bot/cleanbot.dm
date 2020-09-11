@@ -50,7 +50,7 @@
 
 /mob/living/simple_animal/bot/cleanbot/bot_reset()
 	..()
-	ignore_list = list() //Allows the bot to clean targets it previously ignored due to being unreachable.
+	ignore_list.Cut() //Allows the bot to clean targets it previously ignored due to being unreachable.
 	target = null
 	oldloc = null
 
@@ -106,7 +106,7 @@
 		audible_message("[src] makes an excited beeping booping sound!")
 
 	if(!target) //Search for cleanables it can see.
-		target = scan(/obj/effect/decal/cleanable/)
+		target = scan(/obj/effect/decal/cleanable)
 
 	if(!target && auto_patrol) //Search for cleanables it can see.
 		if(mode == BOT_IDLE || mode == BOT_START_PATROL)
@@ -179,21 +179,15 @@
 	on = 0
 	visible_message("<span class='userdanger'>[src] blows apart!</span>")
 	var/turf/Tsec = get_turf(src)
-
 	new /obj/item/reagent_containers/glass/bucket(Tsec)
-
 	new /obj/item/assembly/prox_sensor(Tsec)
-
 	if(prob(50))
-		new /obj/item/robot_parts/l_arm(Tsec)
-
-	var/datum/effect_system/spark_spread/s = new /datum/effect_system/spark_spread
-	s.set_up(3, 1, src)
-	s.start()
+		drop_part(robot_arm, Tsec)
+	do_sparks(3, 1, src)
 	..()
 
 /obj/machinery/bot_core/cleanbot
-	req_one_access = list(access_janitor, access_robotics)
+	req_one_access = list(ACCESS_JANITOR, ACCESS_ROBOTICS)
 
 
 /mob/living/simple_animal/bot/cleanbot/get_controls(mob/user)

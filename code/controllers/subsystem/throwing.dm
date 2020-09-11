@@ -7,6 +7,7 @@ SUBSYSTEM_DEF(throwing)
 	wait = 1
 	flags = SS_NO_INIT|SS_KEEP_TIMING|SS_TICKER
 	runlevels = RUNLEVEL_GAME | RUNLEVEL_POSTGAME
+	offline_implications = "Thrown objects may not react properly. Shuttle call recommended."
 
 	var/list/currentrun
 	var/list/processing = list()
@@ -53,6 +54,7 @@ SUBSYSTEM_DEF(throwing)
 	var/dist_y
 	var/dx
 	var/dy
+	var/force = MOVE_FORCE_DEFAULT
 	var/pure_diagonal
 	var/diagonal_error
 	var/datum/callback/callback
@@ -141,7 +143,7 @@ SUBSYSTEM_DEF(throwing)
 /datum/thrownthing/proc/hitcheck()
 	for(var/thing in get_turf(thrownthing))
 		var/atom/movable/AM = thing
-		if(AM == thrownthing)
+		if(AM == thrownthing || AM == thrower)
 			continue
 		if(AM.density && !(AM.pass_flags & LETPASSTHROW) && !(AM.flags & ON_BORDER))
 			finalize(hit = TRUE, target = AM)

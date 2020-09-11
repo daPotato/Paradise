@@ -13,13 +13,13 @@
 	activation_message   = "You feel unable to express yourself at all."
 	deactivation_message = "You feel able to speak freely again."
 	instability = -GENE_INSTABILITY_MODERATE
-	disability = MUTE
+	mutation = MUTE
 
 /datum/dna/gene/disability/mute/New()
 	..()
-	block=MUTEBLOCK
+	block = GLOB.muteblock
 
-/datum/dna/gene/disability/mute/OnSay(var/mob/M, var/message)
+/datum/dna/gene/disability/mute/OnSay(mob/M, message)
 	return ""
 
 ////////////////////////////////////////
@@ -36,30 +36,29 @@
 
 /datum/dna/gene/disability/radioactive/New()
 	..()
-	block=RADBLOCK
+	block = GLOB.radblock
 
 
-/datum/dna/gene/disability/radioactive/can_activate(var/mob/M,var/flags)
+/datum/dna/gene/disability/radioactive/can_activate(mob/M, flags)
 	if(!..())
-		return 0
+		return FALSE
 	if(ishuman(M))
 		var/mob/living/carbon/human/H = M
-		if((RADIMMUNE in H.species.species_traits) && !(flags & MUTCHK_FORCED))
-			return 0
-	return 1
+		if((RADIMMUNE in H.dna.species.species_traits) && !(flags & MUTCHK_FORCED))
+			return FALSE
+	return TRUE
 
-/datum/dna/gene/disability/radioactive/OnMobLife(var/mob/living/owner)
-	var/radiation_amount = abs(min(owner.radiation - 20,0))
-	owner.apply_effect(radiation_amount, IRRADIATE)
-	for(var/mob/living/L in range(1, owner))
-		if(L == owner)
+/datum/dna/gene/disability/radioactive/OnMobLife(mob/living/carbon/human/H)
+	var/radiation_amount = abs(min(H.radiation - 20,0))
+	H.apply_effect(radiation_amount, IRRADIATE)
+	for(var/mob/living/L in range(1, H))
+		if(L == H)
 			continue
-		to_chat(L, "<span class='danger'>You are enveloped by a soft green glow emanating from [owner].</span>")
+		to_chat(L, "<span class='danger'>You are enveloped by a soft green glow emanating from [H].</span>")
 		L.apply_effect(5, IRRADIATE)
-	return
 
-/datum/dna/gene/disability/radioactive/OnDrawUnderlays(var/mob/M,var/g,var/fat)
-	return "rads[fat]_s"
+/datum/dna/gene/disability/radioactive/OnDrawUnderlays(mob/M, g)
+	return "rads_s"
 
 ////////////////////////////////////////
 // Other disabilities
@@ -76,7 +75,7 @@
 
 /datum/dna/gene/disability/fat/New()
 	..()
-	block=FATBLOCK
+	block = GLOB.fatblock
 
 // WAS: /datum/bioEffect/chav
 /datum/dna/gene/disability/speech/chav
@@ -88,9 +87,9 @@
 
 /datum/dna/gene/disability/speech/chav/New()
 	..()
-	block=CHAVBLOCK
+	block = GLOB.chavblock
 
-/datum/dna/gene/disability/speech/chav/OnSay(var/mob/M, var/message)
+/datum/dna/gene/disability/speech/chav/OnSay(mob/M, message)
 	// THIS ENTIRE THING BEGS FOR REGEX
 	message = replacetext(message,"dick","prat")
 	message = replacetext(message,"comdom","knob'ead")
@@ -127,9 +126,9 @@
 
 /datum/dna/gene/disability/speech/swedish/New()
 	..()
-	block=SWEDEBLOCK
+	block = GLOB.swedeblock
 
-/datum/dna/gene/disability/speech/swedish/OnSay(var/mob/M, var/message)
+/datum/dna/gene/disability/speech/swedish/OnSay(mob/M, message)
 	// svedish
 	message = replacetextEx(message,"W","V")
 	message = replacetextEx(message,"w","v")
@@ -142,7 +141,7 @@
 	message = replacetextEx(message,"bo","bjo")
 	message = replacetextEx(message,"O",pick("Ö","Ø","O"))
 	message = replacetextEx(message,"o",pick("ö","ø","o"))
-	if(prob(30))
+	if(prob(30) && !M.is_muzzled())
 		message += " Bork[pick("",", bork",", bork, bork")]!"
 	return message
 
@@ -157,10 +156,10 @@
 
 /datum/dna/gene/disability/unintelligable/New()
 	..()
-	block=SCRAMBLEBLOCK
+	block = GLOB.scrambleblock
 
-/datum/dna/gene/disability/unintelligable/OnSay(var/mob/M, var/message)
-	var/prefix=copytext(message,1,2)
+/datum/dna/gene/disability/unintelligable/OnSay(mob/M, message)
+	var/prefix = copytext(message,1,2)
 	if(prefix == ";")
 		message = copytext(message,2)
 	else if(prefix in list(":","#"))
@@ -175,24 +174,12 @@
 		var/cword = pick(words)
 		words.Remove(cword)
 		var/suffix = copytext(cword,length(cword)-1,length(cword))
-		while(length(cword)>0 && suffix in list(".",",",";","!",":","?"))
+		while(length(cword)>0 && (suffix in list(".",",",";","!",":","?")))
 			cword  = copytext(cword,1              ,length(cword)-1)
 			suffix = copytext(cword,length(cword)-1,length(cword)  )
 		if(length(cword))
 			rearranged += cword
 	return "[prefix][uppertext(jointext(rearranged," "))]!!"
-
-// WAS: /datum/bioEffect/toxic_farts
-/datum/dna/gene/disability/toxic_farts
-	name = "Toxic Farts"
-	desc = "Causes the subject's digestion to create a significant amount of noxious gas."
-	activation_message = "Your stomach grumbles unpleasantly."
-	deactivation_message = "Your stomach stops acting up. Phew!"
-	mutation = TOXIC_FARTS
-
-/datum/dna/gene/disability/toxic_farts/New()
-	..()
-	block=TOXICFARTBLOCK
 
 //////////////////
 // USELESS SHIT //
@@ -209,7 +196,7 @@
 
 /datum/dna/gene/disability/strong/New()
 	..()
-	block=STRONGBLOCK
+	block = GLOB.strongblock
 
 // WAS: /datum/bioEffect/horns
 /datum/dna/gene/disability/horns
@@ -221,9 +208,9 @@
 
 /datum/dna/gene/disability/horns/New()
 	..()
-	block=HORNSBLOCK
+	block = GLOB.hornsblock
 
-/datum/dna/gene/disability/horns/OnDrawUnderlays(var/mob/M,var/g,var/fat)
+/datum/dna/gene/disability/horns/OnDrawUnderlays(mob/M, g)
 	return "horns_s"
 
 ////////////////////////////////////////////////////////////////////////
@@ -235,11 +222,11 @@
 	deactivation_messages = list("You no longer feel uncomfortably hot.")
 	mutation = IMMOLATE
 
-	spelltype=/obj/effect/proc_holder/spell/targeted/immolate
+	spelltype = /obj/effect/proc_holder/spell/targeted/immolate
 
 /datum/dna/gene/basic/grant_spell/immolate/New()
 	..()
-	block = IMMOLATEBLOCK
+	block = GLOB.immolateblock
 
 /obj/effect/proc_holder/spell/targeted/immolate
 	name = "Incendiary Mitochondria"

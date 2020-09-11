@@ -17,15 +17,15 @@
 		return temp_access
 
 /obj/item/card/id/guest/examine(mob/user)
-	..(user)
+	. = ..()
 	if(world.time < expiration_time)
-		to_chat(user, "<span class='notice'>This pass expires at [station_time_timestamp("hh:mm:ss", expiration_time)].</span>")
+		. += "<span class='notice'>This pass expires at [station_time_timestamp("hh:mm:ss", expiration_time)].</span>"
 	else
-		to_chat(user, "<span class='warning'>It expired at [station_time_timestamp("hh:mm:ss", expiration_time)].</span>")
-	to_chat(user, "<span class='notice'>It grants access to following areas:</span>")
+		. += "<span class='warning'>It expired at [station_time_timestamp("hh:mm:ss", expiration_time)].</span>"
+	. += "<span class='notice'>It grants access to following areas:</span>"
 	for(var/A in temp_access)
-		to_chat(user, "<span class='notice'>[get_access_desc(A)].</span>")
-	to_chat(user, "<span class='notice'>Issuing reason: [reason].</span>")
+		. += "<span class='notice'>[get_access_desc(A)].</span>"
+	. += "<span class='notice'>Issuing reason: [reason].</span>"
 
 /////////////////////////////////////////////
 //Guest pass terminal////////////////////////
@@ -48,20 +48,22 @@
 	var/list/internal_log = list()
 	var/mode = 0  // 0 - making pass, 1 - viewing logs
 
-/obj/machinery/computer/guestpass/attackby(obj/O, mob/user, params)
-	if(istype(O, /obj/item/card/id))
+/obj/machinery/computer/guestpass/attackby(obj/item/I, mob/user, params)
+	if(istype(I, /obj/item/card/id))
 		if(!giver)
-			user.drop_item()
-			O.loc = src
-			giver = O
-			updateUsrDialog()
+			if(user.drop_item())
+				I.forceMove(src)
+				giver = I
+				updateUsrDialog()
 		else
 			to_chat(user, "<span class='warning'>There is already ID card inside.</span>")
+		return
+	return ..()
 
 /obj/machinery/computer/guestpass/proc/get_changeable_accesses()
 	return giver.access
 
-/obj/machinery/computer/guestpass/attack_ai(var/mob/user as mob)
+/obj/machinery/computer/guestpass/attack_ai(mob/user)
 	return attack_hand(user)
 
 
@@ -191,5 +193,5 @@
 
 /obj/machinery/computer/guestpass/hop/get_changeable_accesses()
 	. = ..()
-	if(. && access_change_ids in .)
+	if(. && (ACCESS_CHANGE_IDS in .))
 		return get_all_accesses()

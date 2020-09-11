@@ -28,20 +28,11 @@
 		var/discomfort = min( abs(exposed_temperature - bodytemperature)*(exposed_intensity)/2000000, 1.0)
 		adjustFireLoss(5.0*discomfort)
 
-/mob/living/carbon/brain/handle_regular_status_updates()
-	updatehealth()
-
-	if(stat == DEAD)
-		blinded = 1
-		SetSilence(0)
-	else
-		if(!container && (health < config.health_threshold_dead || ((world.time - timeofhostdeath) > config.revival_brain_life)))
+/mob/living/carbon/brain/Life()
+	. = ..()
+	if(.)
+		if(!container && (world.time - timeofhostdeath) > config.revival_brain_life)
 			death()
-			blinded = 1
-			SetSilence(0)
-			return 1
-
-		. = 1
 
 /mob/living/carbon/brain/breathe()
 	return

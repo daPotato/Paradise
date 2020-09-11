@@ -31,27 +31,26 @@
 	for(var/V in actions)
 		var/datum/action/A = V
 		A.Remove(user)
+	actions.Cut()
 	if(user.client)
 		user.reset_perspective(null)
 		eyeobj.RemoveImages()
 	eyeobj.eye_user = null
 	user.remote_control = null
-	user.remote_view = FALSE
 
 	current_user = null
 	user.unset_machine()
 	playsound(src, 'sound/machines/terminal_off.ogg', 25, 0)
 
 /obj/machinery/computer/camera_advanced/check_eye(mob/user)
-	if((stat & (NOPOWER|BROKEN)) || !Adjacent(user) || !user.has_vision() || user.incapacitated())
+	if((stat & (NOPOWER|BROKEN)) || (!Adjacent(user) && !user.has_unlimited_silicon_privilege) || !user.has_vision() || user.incapacitated())
 		user.unset_machine()
-		return 0
-	return 1
 
 /obj/machinery/computer/camera_advanced/Destroy()
 	if(current_user)
 		current_user.unset_machine()
 	QDEL_NULL(eyeobj)
+	QDEL_LIST(actions)
 	return ..()
 
 /obj/machinery/computer/camera_advanced/on_unset_machine(mob/M)
@@ -73,7 +72,7 @@
 
 	if(!eyeobj.eye_initialized)
 		var/camera_location
-		for(var/obj/machinery/camera/C in cameranet.cameras)
+		for(var/obj/machinery/camera/C in GLOB.cameranet.cameras)
 			if(!C.can_use())
 				continue
 			if(C.network&networks)
@@ -97,8 +96,6 @@
 	current_user = user
 	eyeobj.eye_user = user
 	eyeobj.name = "Camera Eye ([user.name])"
-	// This should be able to be excised once the full view refactor rolls out
-	user.remote_view = 1
 	user.remote_control = eyeobj
 	user.reset_perspective(eyeobj)
 
@@ -136,7 +133,8 @@
 			return
 		T = get_turf(T)
 		loc = T
-		cameranet.visibility(src)
+		if(use_static)
+			GLOB.cameranet.visibility(src, GetViewerClient())
 		if(visible_icon)
 			if(eye_user.client)
 				eye_user.client.images -= user_image
@@ -186,7 +184,7 @@
 
 	var/list/L = list()
 
-	for(var/obj/machinery/camera/cam in cameranet.cameras)
+	for(var/obj/machinery/camera/cam in GLOB.cameranet.cameras)
 		L.Add(cam)
 
 	camera_sort(L)

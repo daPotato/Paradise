@@ -79,6 +79,7 @@
 	var/obj/item/integrated_radio/signal/sradio // AI's signaller
 
 	var/translator_on = 0 // keeps track of the translator module
+	var/flashlight_on = FALSE //keeps track of the flashlight module
 
 	var/current_pda_messaging = null
 	var/custom_sprite = 0
@@ -114,8 +115,6 @@
 		pda.name = pda.owner + " (" + pda.ownjob + ")"
 		var/datum/data/pda/app/messenger/M = pda.find_program(/datum/data/pda/app/messenger)
 		M.toff = 1
-		var/datum/data/pda/app/chatroom/C = pda.find_program(/datum/data/pda/app/chatroom)
-		C.toff = 1
 	..()
 
 /mob/living/silicon/pai/Destroy()
@@ -125,6 +124,11 @@
 	securityActive2 = null
 	return ..()
 
+/mob/living/silicon/pai/can_unbuckle()
+	return FALSE
+
+/mob/living/silicon/pai/can_buckle()
+	return FALSE
 
 /mob/living/silicon/pai/movement_delay()
 	. = ..()
@@ -162,9 +166,8 @@
 	return 1
 
 /mob/living/silicon/pai/blob_act()
-	if(stat != 2)
+	if(stat != DEAD)
 		adjustBruteLoss(60)
-		updatehealth()
 		return 1
 	return 0
 
@@ -228,19 +231,12 @@
 
 // See software.dm for Topic()
 
-/mob/living/silicon/pai/attack_animal(mob/living/simple_animal/M as mob)
-	if(M.melee_damage_upper == 0)
-		M.custom_emote(1, "[M.friendly] [src]")
-	else
-		M.do_attack_animation(src)
-		if(M.attack_sound)
-			playsound(loc, M.attack_sound, 50, 1, 1)
-		for(var/mob/O in viewers(src, null))
-			O.show_message("<span class='danger'>[M]</span> [M.attacktext] [src]!", 1)
+/mob/living/silicon/pai/attack_animal(mob/living/simple_animal/M)
+	. = ..()
+	if(.)
 		var/damage = rand(M.melee_damage_lower, M.melee_damage_upper)
 		add_attack_logs(M, src, "Animal attacked for [damage] damage")
 		adjustBruteLoss(damage)
-		updatehealth()
 
 /mob/living/silicon/pai/proc/switchCamera(var/obj/machinery/camera/C)
 	usr:cameraFollow = null
@@ -322,15 +318,15 @@
 	set category = "pAI Commands"
 	set name = "Unfold Chassis"
 
-	if(stat || sleeping || paralysis || weakened)
+	if(stat || sleeping || paralysis || IsWeakened())
 		return
 
 	if(loc != card)
-		to_chat(src, "<span class=warning>You are already in your mobile form!</span>")
+		to_chat(src, "<span class='warning'>You are already in your mobile form!</span>")
 		return
 
 	if(world.time <= last_special)
-		to_chat(src, "<span class=warning>You must wait before folding your chassis out again!</span>")
+		to_chat(src, "<span class='warning'>You must wait before folding your chassis out again!</span>")
 		return
 
 	last_special = world.time + 200
@@ -338,7 +334,7 @@
 	//I'm not sure how much of this is necessary, but I would rather avoid issues.
 	force_fold_out()
 
-	visible_message("<span class=notice>[src] folds outwards, expanding into a mobile form.</span>", "<span class=notice>You fold outwards, expanding into a mobile form.</span>")
+	visible_message("<span class='notice'>[src] folds outwards, expanding into a mobile form.</span>", "<span class='notice'>You fold outwards, expanding into a mobile form.</span>")
 
 /mob/living/silicon/pai/proc/force_fold_out()
 	if(istype(card.loc, /mob))
@@ -357,15 +353,15 @@
 	set category = "pAI Commands"
 	set name = "Collapse Chassis"
 
-	if(stat || sleeping || paralysis || weakened)
+	if(stat || sleeping || paralysis || IsWeakened())
 		return
 
 	if(loc == card)
-		to_chat(src, "<span class=warning>You are already in your card form!</span>")
+		to_chat(src, "<span class='warning'>You are already in your card form!</span>")
 		return
 
 	if(world.time <= last_special)
-		to_chat(src, "<span class=warning>You must wait before returning to your card form!</span>")
+		to_chat(src, "<span class='warning'>You must wait before returning to your card form!</span>")
 		return
 
 	close_up()
@@ -439,9 +435,6 @@
 	// Pass lying down or getting up to our pet human, if we're in a rig.
 	if(stat == CONSCIOUS && istype(loc,/obj/item/paicard))
 		resting = 0
-		var/obj/item/rig/rig = get_rig()
-		if(istype(rig))
-			rig.force_rest(src)
 	else
 		resting = !resting
 		to_chat(src, "<span class='notice'>You are now [resting ? "resting" : "getting up"]</span>")
@@ -456,9 +449,7 @@
 		if(stat == DEAD)
 			to_chat(user, "<span class='danger'>\The [src] is beyond help, at this point.</span>")
 		else if(getBruteLoss() || getFireLoss())
-			adjustBruteLoss(-15)
-			adjustFireLoss(-15)
-			updatehealth()
+			heal_overall_damage(15, 15)
 			N.use(1)
 			user.visible_message("<span class='notice'>[user.name] applied some [W] at [src]'s damaged areas.</span>",\
 				"<span class='notice'>You apply some [W] at [name]'s damaged areas.</span>")
@@ -469,12 +460,14 @@
 	else if(W.force)
 		visible_message("<span class='danger'>[user.name] attacks [src] with [W]!</span>")
 		adjustBruteLoss(W.force)
-		updatehealth()
 	else
 		visible_message("<span class='warning'>[user.name] bonks [src] harmlessly with [W].</span>")
 	spawn(1)
 		if(stat != 2)
 			close_up()
+	return
+
+/mob/living/silicon/pai/welder_act()
 	return
 
 /mob/living/silicon/pai/attack_hand(mob/user as mob)
@@ -496,7 +489,7 @@
 	if(loc == card)
 		return
 
-	visible_message("<span class=notice>[src] neatly folds inwards, compacting down to a rectangular card.</span>", "<span class=notice>You neatly fold inwards, compacting down to a rectangular card.</span>")
+	visible_message("<span class='notice'>[src] neatly folds inwards, compacting down to a rectangular card.</span>", "<span class='notice'>You neatly fold inwards, compacting down to a rectangular card.</span>")
 
 	stop_pulling()
 	reset_perspective(card)
@@ -524,20 +517,15 @@
 /mob/living/silicon/pai/Bumped()
 	return
 
-/mob/living/silicon/pai/start_pulling(var/atom/movable/AM)
-	if(stat || sleeping || paralysis || weakened)
-		return
-	if(istype(AM,/obj/item))
-		to_chat(src, "<span class='warning'>You are far too small to pull anything!</span>")
-	return
+/mob/living/silicon/pai/start_pulling(atom/movable/AM, state, force = pull_force, show_message = FALSE)
+	return FALSE
 
 /mob/living/silicon/pai/update_canmove(delay_action_updates = 0)
 	. = ..()
 	density = 0 //this is reset every canmove update otherwise
 
 /mob/living/silicon/pai/examine(mob/user)
-	to_chat(user, "<span class='info'>*---------*</span>")
-	..(user)
+	. = ..()
 
 	var/msg = "<span class='info'>"
 
@@ -550,16 +538,15 @@
 	if(print_flavor_text()) msg += "\n[print_flavor_text()]"
 
 	if(pose)
-		if( findtext(pose,".",lentext(pose)) == 0 && findtext(pose,"!",lentext(pose)) == 0 && findtext(pose,"?",lentext(pose)) == 0 )
+		if( findtext(pose,".",length(pose)) == 0 && findtext(pose,"!",length(pose)) == 0 && findtext(pose,"?",length(pose)) == 0 )
 			pose = addtext(pose,".") //Makes sure all emotes end with a period.
 		msg += "\nIt is [pose]"
 	msg += "\n*---------*</span>"
 
-	to_chat(user, msg)
+	. += msg
 
 /mob/living/silicon/pai/bullet_act(var/obj/item/projectile/Proj)
 	..(Proj)
-	updatehealth()
 	if(stat != 2)
 		spawn(1)
 			close_up()
@@ -575,6 +562,10 @@
 /mob/living/silicon/pai/get_scooped(mob/living/carbon/grabber)
 	var/obj/item/holder/H = ..()
 	if(!istype(H))
+		return
+	if(stat == DEAD)
+		H.icon = 'icons/mob/pai.dmi'
+		H.icon_state = "[chassis]_dead"
 		return
 	if(resting)
 		icon_state = "[chassis]"
@@ -619,3 +610,8 @@
 	else //something went very wrong.
 		CRASH("pAI without card")
 	loc = card
+
+/mob/living/silicon/pai/extinguish_light()
+	flashlight_on = FALSE
+	set_light(0)
+	card.set_light(0)

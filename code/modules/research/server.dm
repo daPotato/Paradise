@@ -12,7 +12,7 @@
 	var/heat_gen = 100
 	var/heating_power = 40000
 	var/delay = 10
-	req_access = list(access_rd) //Only the R&D can change server settings.
+	req_access = list(ACCESS_RD) //Only the R&D can change server settings.
 	var/plays_sound = 0
 
 /obj/machinery/r_n_d/server/New()
@@ -45,7 +45,8 @@
 	heat_gen /= max(1, tot_rating)
 
 /obj/machinery/r_n_d/server/proc/initialize_serv()
-	if(!files) files = new /datum/research(src)
+	if(!files)
+		files = new /datum/research(src)
 	var/list/temp_list
 	if(!id_with_upload.len)
 		temp_list = list()
@@ -67,7 +68,7 @@
 		if(0 to T0C)
 			health = min(100, health + 1)
 		if(T0C to (T20C + 20))
-			health = Clamp(health, 0, 100)
+			health = clamp(health, 0, 100)
 		if((T20C + 20) to (T0C + 70))
 			health = max(0, health - 1)
 	if(health <= 0)
@@ -96,16 +97,15 @@
 
 /obj/machinery/r_n_d/server/ex_act(severity)
 	griefProtection()
-	..()
+	return ..()
 
-
-/obj/machinery/r_n_d/server/blob_act()
+/obj/machinery/r_n_d/server/blob_act(obj/structure/blob/B)
 	griefProtection()
-	..()
+	return ..()
 
 // Backup files to CentComm to help admins recover data after griefer attacks
 /obj/machinery/r_n_d/server/proc/griefProtection()
-	for(var/obj/machinery/r_n_d/server/centcom/C in machines)
+	for(var/obj/machinery/r_n_d/server/centcom/C in GLOB.machines)
 		files.push_data(C.files)
 
 /obj/machinery/r_n_d/server/proc/produce_heat(heat_amt)
@@ -146,8 +146,10 @@
 	if(panel_open)
 		if(istype(O, /obj/item/crowbar))
 			griefProtection()
-			default_deconstruction_crowbar(O)
+			default_deconstruction_crowbar(user, O)
 			return 1
+	else
+		return ..()
 
 /obj/machinery/r_n_d/server/attack_hand(mob/user as mob)
 	if(disabled)
@@ -165,7 +167,7 @@
 	..()
 	var/list/no_id_servers = list()
 	var/list/server_ids = list()
-	for(var/obj/machinery/r_n_d/server/S in machines)
+	for(var/obj/machinery/r_n_d/server/S in GLOB.machines)
 		switch(S.server_id)
 			if(-1)
 				continue
@@ -217,20 +219,20 @@
 		temp_server = null
 		consoles = list()
 		servers = list()
-		for(var/obj/machinery/r_n_d/server/S in machines)
+		for(var/obj/machinery/r_n_d/server/S in GLOB.machines)
 			if(S.server_id == text2num(href_list["access"]) || S.server_id == text2num(href_list["data"]) || S.server_id == text2num(href_list["transfer"]))
 				temp_server = S
 				break
 		if(href_list["access"])
 			screen = 1
-			for(var/obj/machinery/computer/rdconsole/C in machines)
+			for(var/obj/machinery/computer/rdconsole/C in GLOB.machines)
 				if(C.sync)
 					consoles += C
 		else if(href_list["data"])
 			screen = 2
 		else if(href_list["transfer"])
 			screen = 3
-			for(var/obj/machinery/r_n_d/server/S in machines)
+			for(var/obj/machinery/r_n_d/server/S in GLOB.machines)
 				if(S == src)
 					continue
 				servers += S
@@ -252,7 +254,8 @@
 	else if(href_list["reset_tech"])
 		var/choice = alert("Technology Data Reset", "Are you sure you want to reset this technology to its default data? Data lost cannot be recovered.", "Continue", "Cancel")
 		if(choice == "Continue")
-			for(var/datum/tech/T in temp_server.files.known_tech)
+			for(var/I in temp_server.files.known_tech)
+				var/datum/tech/T = temp_server.files.known_tech[I]
 				if(T.id == href_list["reset_tech"])
 					T.level = 1
 					break
@@ -261,9 +264,10 @@
 	else if(href_list["reset_design"])
 		var/choice = alert("Design Data Deletion", "Are you sure you want to delete this design? Data lost cannot be recovered.", "Continue", "Cancel")
 		if(choice == "Continue")
-			for(var/datum/design/D in temp_server.files.known_designs)
+			for(var/I in temp_server.files.known_designs)
+				var/datum/design/D = temp_server.files.known_designs[I]
 				if(D.id == href_list["reset_design"])
-					temp_server.files.known_designs -= D
+					temp_server.files.known_designs -= D.id
 					break
 		temp_server.files.RefreshResearch()
 
@@ -280,7 +284,7 @@
 		if(0) //Main Menu
 			dat += "Connected Servers:<BR><BR>"
 
-			for(var/obj/machinery/r_n_d/server/S in machines)
+			for(var/obj/machinery/r_n_d/server/S in GLOB.machines)
 				if(istype(S, /obj/machinery/r_n_d/server/centcom) && !badmin)
 					continue
 				dat += "[S.name] || "
@@ -310,15 +314,17 @@
 			dat += "<HR><A href='?src=[UID()];main=1'>Main Menu</A>"
 
 		if(2) //Data Management menu
-			dat += "[temp_server.name] Data ManagementP<BR><BR>"
+			dat += "[temp_server.name] Data Management<BR><BR>"
 			dat += "Known Technologies<BR>"
-			for(var/datum/tech/T in temp_server.files.known_tech)
+			for(var/I in temp_server.files.known_tech)
+				var/datum/tech/T = temp_server.files.known_tech[I]
 				if(T.level <= 0)
 					continue
 				dat += "* [T.name] "
 				dat += "<A href='?src=[UID()];reset_tech=[T.id]'>(Reset)</A><BR>" //FYI, these are all strings.
 			dat += "Known Designs<BR>"
-			for(var/datum/design/D in temp_server.files.known_designs)
+			for(var/I in temp_server.files.known_designs)
+				var/datum/design/D = temp_server.files.known_designs[I]
 				dat += "* [D.name] "
 				dat += "<A href='?src=[UID()];reset_design=[D.id]'>(Delete)</A><BR>"
 			dat += "<HR><A href='?src=[UID()];main=1'>Main Menu</A>"

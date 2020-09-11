@@ -19,7 +19,7 @@ log transactions
 	icon = 'icons/obj/terminals.dmi'
 	icon_state = "atm"
 	anchored = 1
-	use_power = 1
+	use_power = IDLE_POWER_USE
 	idle_power_usage = 10
 	var/obj/machinery/computer/account_database/linked_db
 	var/datum/money_account/authenticated_account
@@ -36,7 +36,7 @@ log transactions
 
 /obj/machinery/atm/New()
 	..()
-	machine_id = "[station_name()] RT #[num_financial_terminals++]"
+	machine_id = "[station_name()] RT #[GLOB.num_financial_terminals++]"
 
 /obj/machinery/atm/Initialize()
 	..()
@@ -71,10 +71,10 @@ log transactions
 				playsound(loc, pick('sound/items/polaroid1.ogg', 'sound/items/polaroid2.ogg'), 50, 1)
 				for(var/obj/item/stack/spacecash/S in T)
 					S.use(S.amount)
-				authenticated_account.charge(-cash_amount, null, "Credit deposit", terminal_id = machine_id, dest_name = "Terminal")
+				authenticated_account.charge(-cash_amount, null, "Credit deposit", machine_id, "Terminal")
 
 /obj/machinery/atm/proc/reconnect_database()
-	for(var/obj/machinery/computer/account_database/DB in machines)
+	for(var/obj/machinery/computer/account_database/DB in GLOB.machines)
 		if(DB.z == z && !(DB.stat & NOPOWER) && DB.activated)
 			linked_db = DB
 			break
@@ -97,24 +97,15 @@ log transactions
 			if(!powered())
 				return
 			var/obj/item/stack/spacecash/C = I
-			authenticated_account.money += C.amount
 			playsound(loc, pick('sound/items/polaroid1.ogg', 'sound/items/polaroid2.ogg'), 50, 1)
 
-			//create a transaction log entry
-			var/datum/transaction/T = new()
-			T.target_name = authenticated_account.owner_name
-			T.purpose = "Credit deposit"
-			T.amount = C.amount
-			T.source_terminal = machine_id
-			T.date = current_date_string
-			T.time = station_time_timestamp()
-			authenticated_account.transaction_log.Add(T)
+			authenticated_account.credit(C.amount, "Credit deposit", machine_id, authenticated_account.owner_name)
 
 			to_chat(user, "<span class='info'>You insert [C] into [src].</span>")
 			SSnanoui.update_uis(src)
 			C.use(C.amount)
 	else
-		..()
+		return ..()
 
 /obj/machinery/atm/attack_hand(mob/user)
 	if(..())
@@ -136,7 +127,7 @@ log transactions
 		ui = new(user, src, ui_key, "atm.tmpl", name, 550, 650)
 		ui.open()
 
-/obj/machinery/atm/ui_data(mob/user, ui_key = "main", datum/topic_state/state = default_state)
+/obj/machinery/atm/ui_data(mob/user, ui_key = "main", datum/topic_state/state = GLOB.default_state)
 	var/data[0]
 	data["src"] = UID()
 	data["view_screen"] = view_screen
@@ -175,19 +166,8 @@ log transactions
 					else if(transfer_amount <= authenticated_account.money)
 						var/target_account_number = text2num(href_list["target_acc_number"])
 						var/transfer_purpose = href_list["purpose"]
-						if(linked_db.charge_to_account(target_account_number, authenticated_account.owner_name, transfer_purpose, machine_id, transfer_amount))
+						if(linked_db.charge_to_account(target_account_number, authenticated_account, transfer_purpose, machine_id, transfer_amount))
 							to_chat(usr, "[bicon(src)]<span class='info'>Funds transfer successful.</span>")
-							authenticated_account.money -= transfer_amount
-
-							//create an entry in the account transaction log
-							var/datum/transaction/T = new()
-							T.target_name = "Account #[target_account_number]"
-							T.purpose = transfer_purpose
-							T.source_terminal = machine_id
-							T.date = current_date_string
-							T.time = station_time_timestamp()
-							T.amount = "([transfer_amount])"
-							authenticated_account.transaction_log.Add(T)
 						else
 							to_chat(usr, "[bicon(src)]<span class='warning'>Funds transfer failed.</span>")
 
@@ -223,7 +203,7 @@ log transactions
 										T.target_name = failed_account.owner_name
 										T.purpose = "Unauthorised login attempt"
 										T.source_terminal = machine_id
-										T.date = current_date_string
+										T.date = GLOB.current_date_string
 										T.time = station_time_timestamp()
 										failed_account.transaction_log.Add(T)
 								else
@@ -243,7 +223,7 @@ log transactions
 							T.target_name = authenticated_account.owner_name
 							T.purpose = "Remote terminal access"
 							T.source_terminal = machine_id
-							T.date = current_date_string
+							T.date = GLOB.current_date_string
 							T.time = station_time_timestamp()
 							authenticated_account.transaction_log.Add(T)
 							to_chat(usr, "[bicon(src)]<span class='notice'>Access granted. Welcome user '[authenticated_account.owner_name].'</span>")
@@ -257,21 +237,11 @@ log transactions
 						playsound(src, 'sound/machines/chime.ogg', 50, 1)
 
 						//remove the money
-						if(amount > 10000) // prevent crashes
-							to_chat(usr, "<span class='notice'>The ATM's screen flashes, 'Maximum single withdrawl limit reached, defaulting to 10,000.'</span>")
-							amount = 10000
-						authenticated_account.money -= amount
+						if(amount > 100000) // prevent crashes
+							to_chat(usr, "<span class='notice'>The ATM's screen flashes, 'Maximum single withdrawl limit reached, defaulting to 100,000.'</span>")
+							amount = 100000
 						withdraw_arbitrary_sum(amount)
-
-						//create an entry in the account transaction log
-						var/datum/transaction/T = new()
-						T.target_name = authenticated_account.owner_name
-						T.purpose = "Credit withdrawal"
-						T.amount = "([amount])"
-						T.source_terminal = machine_id
-						T.date = current_date_string
-						T.time = station_time_timestamp()
-						authenticated_account.transaction_log.Add(T)
+						authenticated_account.charge(amount, null, "Credit withdrawal", machine_id, authenticated_account.owner_name)
 					else
 						to_chat(usr, "[bicon(src)]<span class='warning'>You don't have enough funds to do that!</span>")
 			if("balance_statement")
@@ -287,7 +257,7 @@ log transactions
 						<i>Account holder:</i> [authenticated_account.owner_name]<br>
 						<i>Account number:</i> [authenticated_account.account_number]<br>
 						<i>Balance:</i> $[authenticated_account.money]<br>
-						<i>Date and time:</i> [station_time_timestamp()], [current_date_string]<br><br>
+						<i>Date and time:</i> [station_time_timestamp()], [GLOB.current_date_string]<br><br>
 						<i>Service terminal ID:</i> [machine_id]<br>"}
 
 					//stamp the paper

@@ -17,11 +17,13 @@
 	pressure_resistance = 0
 	slot_flags = SLOT_HEAD
 	body_parts_covered = HEAD
-	burn_state = FLAMMABLE
-	burntime = 5
+	resistance_flags = FLAMMABLE
+	max_integrity = 50
 	attack_verb = list("bapped")
-
+	dog_fashion = /datum/dog_fashion/head
+	var/header //Above the main body, displayed at the top
 	var/info		//What's actually written on the paper.
+	var/footer 	//The bottom stuff before the stamp but after the body
 	var/info_links	//A different version of the paper which includes html links at fields and EOF
 	var/stamps		//The (text for the) stamps on the paper.
 	var/fields		//Amount of user created fields
@@ -34,6 +36,8 @@
 	var/contact_poison // Reagent ID to transfer on contact
 	var/contact_poison_volume = 0
 	var/contact_poison_poisoner = null
+	var/paper_width = 400//Width of the window that opens
+	var/paper_height = 400//Height of the window that opens
 
 	var/const/deffont = "Verdana"
 	var/const/signfont = "Times New Roman"
@@ -51,34 +55,41 @@
 		updateinfolinks()
 
 /obj/item/paper/update_icon()
-	if(icon_state == "paper_talisman")
-		return
+	..()
 	if(info)
 		icon_state = "paper_words"
 		return
 	icon_state = "paper"
 
 /obj/item/paper/examine(mob/user)
-	if(in_range(user, src) || istype(user, /mob/dead/observer))
-		show_content(user)
+	. = ..()
+	if(user.is_literate())
+		if(in_range(user, src) || istype(user, /mob/dead/observer))
+			show_content(user)
+		else
+			. += "<span class='notice'>You have to go closer if you want to read it.</span>"
 	else
-		to_chat(user, "<span class='notice'>You have to go closer if you want to read it.</span>")
+		. += "<span class='notice'>You don't know how to read.</span>"
 
 /obj/item/paper/proc/show_content(var/mob/user, var/forceshow = 0, var/forcestars = 0, var/infolinks = 0, var/view = 1)
 	var/datum/asset/assets = get_asset_datum(/datum/asset/simple/paper)
 	assets.send(user)
 
 	var/data
-	if((!user.say_understands(null, all_languages["Galactic Common"]) && !forceshow) || forcestars) //assuming all paper is written in common is better than hardcoded type checks
-		data = "<HTML><HEAD><TITLE>[name]</TITLE></HEAD><BODY>[stars(info)][stamps]</BODY></HTML>"
-		if(view)
-			usr << browse(data, "window=[name]")
-			onclose(usr, "[name]")
+	var/stars = (!user.say_understands(null, GLOB.all_languages["Galactic Common"]) && !forceshow) || forcestars
+	if(stars) //assuming all paper is written in common is better than hardcoded type checks
+		data = "[header][stars(info)][footer][stamps]"
 	else
-		data = "<HTML><HEAD><TITLE>[name]</TITLE></HEAD><BODY>[infolinks ? info_links : info][stamps]</BODY></HTML>"
-		if(view)
-			usr << browse(data, "window=[name]")
-			onclose(usr, "[name]")
+		data = "[header]<div id='markdown'>[infolinks ? info_links : info]</div>[footer][stamps]"
+	if(view)
+		var/datum/browser/popup = new(user, "Paper[UID()]", , paper_width, paper_height)
+		popup.stylesheets = list()
+		popup.set_content(data)
+		if(!stars)
+			popup.add_script("marked.js", 'html/browser/marked.js')
+			popup.add_script("marked-paradise.js", 'html/browser/marked-paradise.js')
+		popup.add_head_content("<title>[name]</title>")
+		popup.open()
 	return data
 
 /obj/item/paper/verb/rename()
@@ -88,6 +99,9 @@
 
 	if((CLUMSY in usr.mutations) && prob(50))
 		to_chat(usr, "<span class='warning'>You cut yourself on the paper.</span>")
+		return
+	if(!usr.is_literate())
+		to_chat(usr, "<span class='notice'>You don't know how to read.</span>")
 		return
 	var/n_name = sanitize(copytext(input(usr, "What would you like to label the paper?", "Paper Labelling", name) as text, 1, MAX_MESSAGE_LEN))
 	if((loc == usr && usr.stat == 0))
@@ -99,7 +113,7 @@
 
 /obj/item/paper/attack_self(mob/living/user as mob)
 	user.examinate(src)
-	if(rigged && (holiday_master.holidays && holiday_master.holidays[APRIL_FOOLS]))
+	if(rigged && (SSholiday.holidays && SSholiday.holidays[APRIL_FOOLS]))
 		if(spam_flag == 0)
 			spam_flag = 1
 			playsound(loc, 'sound/items/bikehorn.ogg', 50, 1)
@@ -120,12 +134,12 @@
 	return
 
 /obj/item/paper/attack(mob/living/carbon/M as mob, mob/living/carbon/user as mob)
-	if(user.zone_sel.selecting == "eyes")
+	if(user.zone_selected == "eyes")
 		user.visible_message("<span class='notice'>You show the paper to [M]. </span>", \
 			"<span class='notice'> [user] holds up a paper and shows it to [M]. </span>")
 		M.examinate(src)
 
-	else if(user.zone_sel.selecting == "mouth")
+	else if(user.zone_selected == "mouth")
 		if(!istype(M, /mob))	return
 
 		if(ishuman(M))
@@ -203,7 +217,7 @@
 
 
 /obj/item/paper/proc/parsepencode(var/t, var/obj/item/pen/P, mob/user as mob)
-	t = pencode_to_html(t, usr, P, TRUE, TRUE, TRUE, deffont, signfont, crayonfont)
+	t = pencode_to_html(html_encode(t), usr, P, TRUE, TRUE, TRUE, deffont, signfont, crayonfont)
 	return t
 
 /obj/item/paper/proc/populatefields()
@@ -273,7 +287,6 @@
 				message_admins("PAPER: [key_name_admin(usr)] tried to use forbidden word in [src]: [bad].")
 				return
 */
-		t = html_encode(t)
 		t = parsepencode(t, i, usr) // Encode everything from pencode to html
 
 		if(id!="end")
@@ -294,18 +307,12 @@
 /obj/item/paper/attackby(obj/item/P, mob/living/user, params)
 	..()
 
-	if(burn_state == ON_FIRE)
+	if(resistance_flags & ON_FIRE)
 		return
 
 	var/clown = 0
 	if(user.mind && (user.mind.assigned_role == "Clown"))
 		clown = 1
-
-	if(istype(P, /obj/item/stack/tape_roll))
-		var/obj/item/stack/tape_roll/tape = P
-		tape.stick(src, user)
-		tape.use(1)
-		return
 
 	if(istype(P, /obj/item/paper) || istype(P, /obj/item/photo))
 		if(istype(P, /obj/item/paper/carbon))
@@ -314,7 +321,7 @@
 				to_chat(user, "<span class='notice'>Take off the carbon copy first.</span>")
 				add_fingerprint(user)
 				return
-		var/obj/item/paper_bundle/B = new(src.loc)
+		var/obj/item/paper_bundle/B = new(src.loc, default_papers = FALSE)
 		if(name != "paper")
 			B.name = name
 		else if(P.name != "paper" && P.name != "photo")
@@ -331,15 +338,15 @@
 			else if(h_user.l_store == src)
 				h_user.unEquip(src)
 				B.loc = h_user
-				B.layer = 20
-				B.plane = HUD_PLANE
+				B.layer = ABOVE_HUD_LAYER
+				B.plane = ABOVE_HUD_PLANE
 				h_user.l_store = B
 				h_user.update_inv_pockets()
 			else if(h_user.r_store == src)
 				h_user.unEquip(src)
 				B.loc = h_user
-				B.layer = 20
-				B.plane = HUD_PLANE
+				B.layer = ABOVE_HUD_LAYER
+				B.plane = ABOVE_HUD_PLANE
 				h_user.r_store = B
 				h_user.update_inv_pockets()
 			else if(h_user.head == src)
@@ -356,13 +363,16 @@
 		B.update_icon()
 
 	else if(istype(P, /obj/item/pen) || istype(P, /obj/item/toy/crayon))
-		var/obj/item/pen/multi/robopen/RP = P
-		if(istype(P, /obj/item/pen/multi/robopen) && RP.mode == 2)
-			RP.RenamePaper(user,src)
+		if(user.is_literate())
+			var/obj/item/pen/multi/robopen/RP = P
+			if(istype(P, /obj/item/pen/multi/robopen) && RP.mode == 2)
+				RP.RenamePaper(user,src)
+			else
+				show_content(user, infolinks = 1)
+			//openhelp(user)
+			return
 		else
-			show_content(user, infolinks = 1)
-		//openhelp(user)
-		return
+			to_chat(user, "<span class='warning'>You don't know how to write!</span>")
 
 	else if(istype(P, /obj/item/stamp))
 		if((!in_range(src, usr) && loc != user && !( istype(loc, /obj/item/clipboard) ) && loc.loc != user && user.get_active_hand() != P))
@@ -395,15 +405,17 @@
 
 	add_fingerprint(user)
 
-/obj/item/paper/fire_act()
+/obj/item/paper/fire_act(datum/gas_mixture/air, exposed_temperature, exposed_volume, global_overlay = TRUE)
 	..()
-	info = "[stars(info)]"
+	if(!(resistance_flags & FIRE_PROOF))
+		info = "<i>Heat-curled corners and sooty words offer little insight. Whatever was once written on this page has been rendered illegible through fire.</i>"
 
 /obj/item/paper/proc/stamp(var/obj/item/stamp/S)
 	stamps += (!stamps || stamps == "" ? "<HR>" : "") + "<img src=large_[S.icon_state].png>"
 
 	var/image/stampoverlay = image('icons/obj/bureaucracy.dmi')
-	var/{x; y;}
+	var/x
+	var/y
 	if(istype(S, /obj/item/stamp/captain) || istype(S, /obj/item/stamp/centcom))
 		x = rand(-2, 0)
 		y = rand(-1, 2)
@@ -476,6 +488,20 @@
 /obj/item/paper/crumpled/bloody
 	icon_state = "scrap_bloodied"
 
+/obj/item/paper/fortune
+	name = "fortune"
+	icon_state = "slip"
+	paper_height = 150
+
+/obj/item/paper/fortune/New()
+	..()
+	var/fortunemessage = pick(GLOB.fortune_cookie_messages)
+	info = "<p style='text-align:center;font-family:[deffont];font-size:120%;font-weight:bold;'>[fortunemessage]</p>"
+	info += "<p style='text-align:center;'><strong>Lucky numbers</strong>: [rand(1,49)], [rand(1,49)], [rand(1,49)], [rand(1,49)], [rand(1,49)]</p>"
+
+/obj/item/paper/fortune/update_icon()
+	..()
+	icon_state = initial(icon_state)
 /*
  * Premade paper
  */
@@ -537,10 +563,6 @@
 	name = "paper- 'Holodeck Disclaimer'"
 	info = "Brusies sustained in the holodeck can be healed simply by sleeping."
 
-/obj/item/paper/spells
-	name = "paper- 'List of Available Spells (READ)'"
-	info = "<p><b>LIST OF SPELLS AVAILABLE</b></p><p>Magic Missile:<br>This spell fires several, slow moving, magic projectiles at nearby targets. If they hit a target, it is paralyzed and takes minor damage.</p><p>Fireball:<br>This spell fires a fireball at a target and does not require wizard garb. Be careful not to fire it at people that are standing next to you.</p><p>Disintegrate:</br>This spell instantly kills somebody adjacent to you with the vilest of magick. It has a long cooldown.</p><p>Disable Technology:<br>This spell disables all weapons, cameras and most other technology in range.</p><p>Smoke:<br>This spell spawns a cloud of choking smoke at your location and does not require wizard garb.</p><p>Blind:<br>This spell temporarly blinds a single person and does not require wizard garb.<p>Forcewall:<br>This spell creates an unbreakable wall that lasts for 30 seconds and does not require wizard garb.</p><p>Blink:<br>This spell randomly teleports you a short distance. Useful for evasion or getting into areas if you have patience.</p><p>Teleport:<br>This spell teleports you to a type of area of your selection. Very useful if you are in danger, but has a decent cooldown, and is unpredictable.</p><p>Mutate:<br>This spell causes you to turn into a hulk, and gain telekinesis for a short while.</p><p>Ethereal Jaunt:<br>This spell creates your ethereal form, temporarily making you invisible and able to pass through walls.</p><p>Knock:<br>This spell opens nearby doors and does not require wizard garb.</p>"
-
 /obj/item/paper/syndimemo
 	name = "paper- 'Memo'"
 	info = "GET DAT FUKKEN DISK"
@@ -565,6 +587,23 @@
 	name = "paper scrap"
 	icon_state = "scrap"
 
+/obj/item/paper/syndicate
+	name = "paper"
+	header = "<p><img style='display: block; margin-left: auto; margin-right: auto;' src='syndielogo.png' width='220' height='135' /></p><hr />"
+	info = ""
+
+/obj/item/paper/nanotrasen
+	name = "paper"
+	header = "<p><img style='display: block; margin-left: auto; margin-right: auto;' src='ntlogo.png' width='220' height='135' /></p><hr />"
+	info =  ""
+
+/obj/item/paper/central_command
+	name = "paper"
+	header ="<p><img style='display: block; margin-left: auto; margin-right: auto;' src='ntlogo.png' alt='' width='220' height='135' /></p><hr /><h3 style='text-align: center;font-family: Verdana;'><b> Nanotrasen Central Command</h3><p style='text-align: center;font-family:Verdana;'>Official Expedited Memorandum</p></b><hr />"
+	info = ""
+	footer = "<hr /><p style='font-family:Verdana;'><em>Failure to adhere appropriately to orders that may be contained herein is in violation of Space Law, and punishments may be administered appropriately upon return to Central Command.</em><br /><em>The recipient(s) of this memorandum acknowledge by reading it that they are liable for any and all damages to crew or station that may arise from ignoring suggestions or advice given herein.</em></p>"
+
+
 /obj/item/paper/crumpled/update_icon()
 	return
 
@@ -579,6 +618,7 @@
 	var/used = 0
 	var/countdown = 60
 	var/activate_on_timeout = 0
+	var/faxmachineid = null
 
 /obj/item/paper/evilfax/show_content(var/mob/user, var/forceshow = 0, var/forcestars = 0, var/infolinks = 0, var/view = 1)
 	if(user == mytarget)
@@ -598,11 +638,11 @@
 
 /obj/item/paper/evilfax/New()
 	..()
-	processing_objects.Add(src)
+	START_PROCESSING(SSobj, src)
 
 
 /obj/item/paper/evilfax/Destroy()
-	processing_objects.Remove(src)
+	STOP_PROCESSING(SSobj, src)
 	if(mytarget && !used)
 		var/mob/living/carbon/target = mytarget
 		target.ForceContractDisease(new /datum/disease/transformation/corgi(0))
@@ -625,7 +665,8 @@
 
 /obj/item/paper/evilfax/proc/evilpaper_specialaction(var/mob/living/carbon/target)
 	spawn(30)
-		if(istype(target,/mob/living/carbon))
+		if(istype(target, /mob/living/carbon))
+			var/obj/machinery/photocopier/faxmachine/fax = locateUID(faxmachineid)
 			if(myeffect == "Borgification")
 				to_chat(target,"<span class='userdanger'>You seem to comprehend the AI a little better. Why are your muscles so stiff?</span>")
 				target.ForceContractDisease(new /datum/disease/transformation/robot(0))
@@ -651,8 +692,31 @@
 					var/mob/living/carbon/human/H = target
 					to_chat(H, "<span class='userdanger'>You feel surrounded by sadness. Sadness... and HONKS!</span>")
 					H.makeCluwne()
-			else if(myeffect == "Demotion Notice")
-				event_announcement.Announce("[mytarget] is hereby demoted to the rank of Civilian. Process this demotion immediately. Failure to comply with these orders is grounds for termination.","CC Demotion Order")
+			else if(myeffect == "Demote")
+				GLOB.event_announcement.Announce("[target.real_name] is hereby demoted to the rank of Civilian. Process this demotion immediately. Failure to comply with these orders is grounds for termination.","CC Demotion Order")
+				for(var/datum/data/record/R in sortRecord(GLOB.data_core.security))
+					if(R.fields["name"] == target.real_name)
+						R.fields["criminal"] = SEC_RECORD_STATUS_DEMOTE
+						R.fields["comments"] += "Central Command Demotion Order, given on [GLOB.current_date_string] [station_time_timestamp()]<BR> Process this demotion immediately. Failure to comply with these orders is grounds for termination."
+				update_all_mob_security_hud()
+			else if(myeffect == "Demote with Bot")
+				GLOB.event_announcement.Announce("[target.real_name] is hereby demoted to the rank of Civilian. Process this demotion immediately. Failure to comply with these orders is grounds for termination.","CC Demotion Order")
+				for(var/datum/data/record/R in sortRecord(GLOB.data_core.security))
+					if(R.fields["name"] == target.real_name)
+						R.fields["criminal"] = SEC_RECORD_STATUS_ARREST
+						R.fields["comments"] += "Central Command Demotion Order, given on [GLOB.current_date_string] [station_time_timestamp()]<BR> Process this demotion immediately. Failure to comply with these orders is grounds for termination."
+				update_all_mob_security_hud()
+				if(fax)
+					var/turf/T = get_turf(fax)
+					new /obj/effect/portal(T)
+					new /mob/living/simple_animal/bot/secbot(T)
+			else if(myeffect == "Revoke Fax Access")
+				GLOB.fax_blacklist += target.real_name
+				if(fax)
+					fax.authenticated = 0
+			else if(myeffect == "Angry Fax Machine")
+				if(fax)
+					fax.become_mimic()
 			else
 				message_admins("Evil paper [src] was activated without a proper effect set! This is a bug.")
 		used = 1
@@ -670,4 +734,17 @@
 			H.reagents.add_reagent(contact_poison, contact_poison_volume)
 			contact_poison = null
 			add_attack_logs(src, user, "Picked up [src], the paper poisoned by [contact_poison_poisoner]")
+	. = ..()
+
+/obj/item/paper/researchnotes
+	name = "paper - 'Research Notes'"
+	info = "<b>The notes appear gibberish to you. Perhaps a destructive analyzer in R&D could make sense of them.</b>"
+	origin_tech = "combat=4;materials=4;engineering=4;biotech=4"
+
+/obj/item/paper/researchnotes/New()
 	..()
+	var/list/possible_techs = list("materials", "engineering", "plasmatech", "powerstorage", "bluespace", "biotech", "combat", "magnets", "programming", "syndicate")
+	var/mytech = pick(possible_techs)
+	var/mylevel = rand(7, 9)
+	origin_tech = "[mytech]=[mylevel]"
+	name = "research notes - [mytech] [mylevel]"

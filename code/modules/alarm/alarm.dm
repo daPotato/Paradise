@@ -29,7 +29,7 @@
 	cameras()	// Sets up both cameras and last alarm area.
 	set_source_data(source, duration, severity)
 
-/datum/alarm/proc/process()
+/datum/alarm/process()
 	// Has origin gone missing?
 	if(!origin && !end_time)
 		end_time = world.time + ALARM_RESET_DELAY
@@ -50,7 +50,7 @@
 		sources_assoc[source] = AS
 	// Currently only non-0 durations can be altered (normal alarms VS EMP blasts)
 	if(AS.duration)
-		duration = SecondsToTicks(duration)
+		duration = duration SECONDS
 		AS.duration = duration
 	AS.severity = severity
 

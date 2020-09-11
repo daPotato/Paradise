@@ -62,10 +62,6 @@ GLOBAL_REAL(Master, /datum/controller/master) = new
 	var/static/current_ticklimit = TICK_LIMIT_RUNNING
 
 /datum/controller/master/New()
-	//temporary file used to record errors with loading config, moved to log directory once logging is set up
-	GLOB.config_error_log = GLOB.world_game_log = GLOB.world_runtime_log = "data/logs/config_error.log"
-	load_configuration()
-	// Highlander-style: there can only be one! Kill off the old and replace it with the new.
 
 	if(!random_seed)
 		random_seed = rand(1, 1e9)
@@ -73,6 +69,7 @@ GLOBAL_REAL(Master, /datum/controller/master) = new
 
 	var/list/_subsystems = list()
 	subsystems = _subsystems
+	// Highlander-style: there can only be one! Kill off the old and replace it with the new.
 	if(Master != src)
 		if(istype(Master))
 			Recover()
@@ -146,10 +143,10 @@ GLOBAL_REAL(Master, /datum/controller/master) = new
 				msg = "The [BadBoy.name] subsystem was the last to fire for 2 controller restarts. It will be recovered now and disabled if it happens again."
 				FireHim = TRUE
 			if(3)
-				msg = "The [BadBoy.name] subsystem seems to be destabilizing the MC and will be offlined."
+				msg = "The [BadBoy.name] subsystem seems to be destabilizing the MC and will be offlined. <span class='info'>The following implications are now in effect: [BadBoy.offline_implications]</span>"
 				BadBoy.flags |= SS_NO_FIRE
 		if(msg)
-			to_chat(admins, "<span class='boldannounce'>[msg]</span>")
+			to_chat(GLOB.admins, "<span class='boldannounce'>[msg]</span>")
 			log_world(msg)
 
 	if(istype(Master.subsystems))
@@ -194,8 +191,8 @@ GLOBAL_REAL(Master, /datum/controller/master) = new
 	to_chat(world, "<span class='boldannounce'>[msg]</span>")
 	log_world(msg)
 
-	if(config.developer_express_start & ticker.current_state == GAME_STATE_PREGAME)
-		ticker.current_state = GAME_STATE_SETTING_UP
+	if(config.developer_express_start & SSticker.current_state == GAME_STATE_PREGAME)
+		SSticker.current_state = GAME_STATE_SETTING_UP
 
 	if(!current_runlevel)
 		SetRunLevel(1)
@@ -203,12 +200,14 @@ GLOBAL_REAL(Master, /datum/controller/master) = new
 	// Sort subsystems by display setting for easy access.
 	sortTim(subsystems, /proc/cmp_subsystem_display)
 	// Set world options.
-	if(sleep_offline_after_initializations)
-		world.sleep_offline = TRUE
 	// world.fps = CONFIG_GET(number/fps) // TIGER TODO
 	world.tick_lag = config.Ticklag
 	var/initialized_tod = REALTIMEOFDAY
+
+	if(sleep_offline_after_initializations)
+		world.sleep_offline = TRUE
 	sleep(1)
+
 	initializations_finished_with_no_players_logged_in = initialized_tod < REALTIMEOFDAY - 10
 	// Loop.
 	Master.StartProcessing(0)
@@ -249,7 +248,7 @@ GLOBAL_REAL(Master, /datum/controller/master) = new
 
 	//all this shit is here so that flag edits can be refreshed by restarting the MC. (and for speed)
 	var/list/tickersubsystems = list()
-	var/list/runlevel_sorted_subsystems = list(list(), list(), list(), list(), list(), list(), list(), list())	//ensure we always have as many runlevels as we need to operate with no subsystems (8 currently)
+	var/list/runlevel_sorted_subsystems = list(list())	//ensure we always have at least one runlevel
 	var/timer = world.time
 	for(var/thing in subsystems)
 		var/datum/controller/subsystem/SS = thing
@@ -452,14 +451,15 @@ GLOBAL_REAL(Master, /datum/controller/master) = new
 			//	in those cases, so we just let them run)
 			if(queue_node_flags & SS_NO_TICK_CHECK)
 				if(queue_node.tick_usage > TICK_LIMIT_RUNNING - TICK_USAGE && ran_non_ticker)
-					queue_node.queued_priority += queue_priority_count * 0.1
-					queue_priority_count -= queue_node_priority
-					queue_priority_count += queue_node.queued_priority
-					current_tick_budget -= queue_node_priority
-					queue_node = queue_node.queue_next
+					if(!(queue_node_flags & SS_BACKGROUND))
+						queue_node.queued_priority += queue_priority_count * 0.1
+						queue_priority_count -= queue_node_priority
+						queue_priority_count += queue_node.queued_priority
+						current_tick_budget -= queue_node_priority
+						queue_node = queue_node.queue_next
 					continue
 
-			if((queue_node_flags & SS_BACKGROUND) && !bg_calc)
+			if(!bg_calc && (queue_node_flags & SS_BACKGROUND))
 				current_tick_budget = queue_priority_count_bg
 				bg_calc = TRUE
 
@@ -470,7 +470,7 @@ GLOBAL_REAL(Master, /datum/controller/master) = new
 			else
 				tick_precentage = tick_remaining
 
-			tick_precentage = max(tick_precentage*0.5, tick_precentage - queue_node.tick_overrun)
+			tick_precentage = max(tick_precentage * 0.5, tick_precentage - queue_node.tick_overrun)
 
 			current_ticklimit = round(TICK_USAGE + tick_precentage)
 
@@ -512,7 +512,7 @@ GLOBAL_REAL(Master, /datum/controller/master) = new
 			queue_node.paused_ticks = 0
 			queue_node.paused_tick_usage = 0
 
-			if(queue_node_flags & SS_BACKGROUND) //update our running total
+			if(bg_calc) //update our running total
 				queue_priority_count_bg -= queue_node_priority
 			else
 				queue_priority_count -= queue_node_priority
@@ -584,10 +584,10 @@ GLOBAL_REAL(Master, /datum/controller/master) = new
 
 /datum/controller/master/stat_entry()
 	if(!statclick)
-		statclick = new/obj/effect/statclick/debug(src, "Initializing...")
+		statclick = new/obj/effect/statclick/debug(null, "Initializing...", src)
 
-	stat("Byond", "(FPS:[world.fps]) (TickCount:[world.time/world.tick_lag]) (TickDrift:[round(Master.tickdrift,1)]([round((Master.tickdrift/(world.time/world.tick_lag))*100,0.1)]%))")
-	stat("Master Controller", statclick.update("(TickRate:[Master.processing]) (Iteration:[Master.iteration])"))
+	stat("Byond:", "(FPS:[world.fps]) (TickCount:[world.time / world.tick_lag]) (TickDrift:[round(Master.tickdrift, 1)]([round((Master.tickdrift / (world.time / world.tick_lag)) * 100, 0.1)]%))")
+	stat("Master Controller:", statclick.update("(TickRate:[Master.processing]) (Iteration:[Master.iteration])"))
 
 // Currently unimplemented
 /datum/controller/master/StartLoadingMap()
@@ -609,7 +609,7 @@ GLOBAL_REAL(Master, /datum/controller/master) = new
 /datum/controller/master/proc/UpdateTickRate()
 	if(!processing)
 		return
-	var/client_count = length(clients)
+	var/client_count = length(GLOB.clients)
 	if(client_count < config.disable_high_pop_mc_mode_amount)
 		processing = config.base_mc_tick_rate
 	else if(client_count > config.high_pop_mc_mode_amount)

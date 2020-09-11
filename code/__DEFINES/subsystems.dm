@@ -14,7 +14,9 @@
 //prevents distinguishing identical timers with the wait variable
 #define TIMER_NO_HASH_WAIT  16
 
-#define TIMER_NO_INVOKE_WARNING 600 //number of byond ticks that are allowed to pass before the timer subsystem thinks it hung on something
+//Loops the timer repeatedly until qdeleted
+//In most cases you want a subsystem instead
+#define TIMER_LOOP			32
 
 #define TIMER_ID_NULL -1
 
@@ -42,7 +44,7 @@
 // Subsystem init_order, from highest priority to lowest priority
 // Subsystems shutdown in the reverse of the order they initialize in
 // The numbers just define the ordering, they are meaningless otherwise.
-
+#define INIT_ORDER_TITLE 100 // This **MUST** load first or people will se blank lobby screens
 #define INIT_ORDER_GARBAGE 19
 #define INIT_ORDER_DBCORE 18
 #define INIT_ORDER_BLACKBOX 17
@@ -59,28 +61,36 @@
 #define INIT_ORDER_LANGUAGE 6
 #define INIT_ORDER_MACHINES 5
 #define INIT_ORDER_CIRCUIT 4
+#define INIT_ORDER_HOLIDAY 3
+#define INIT_ORDER_ALARMS 2
 #define INIT_ORDER_TIMER 1
 #define INIT_ORDER_DEFAULT 0
 #define INIT_ORDER_AIR -1
+#define INIT_ORDER_SUN -2
 #define INIT_ORDER_MINIMAP -3
 #define INIT_ORDER_ASSETS -4
 #define INIT_ORDER_ICON_SMOOTHING -5
 #define INIT_ORDER_OVERLAY -6
 #define INIT_ORDER_XKEYSCORE -10
 #define INIT_ORDER_STICKY_BAN -10
+#define INIT_ORDER_TICKETS -10
 #define INIT_ORDER_LIGHTING -20
 #define INIT_ORDER_SHUTTLE -21
 #define INIT_ORDER_NIGHTSHIFT -22
+#define INIT_ORDER_NANOMOB -23
 #define INIT_ORDER_SQUEAK -40
 #define INIT_ORDER_PATH -50
-#define INIT_ORDER_PERSISTENCE -100
+#define INIT_ORDER_PERSISTENCE		-95
+#define INIT_ORDER_CHAT				-100 //Should be last to ensure chat remains smooth during init.
 
 // Subsystem fire priority, from lowest to highest priority
 // If the subsystem isn't listed here it's either DEFAULT or PROCESS (if it's a processing subsystem child)
 
+#define FIRE_PRIORITY_NANOMOB       10
 #define FIRE_PRIORITY_NIGHTSHIFT	10
 #define FIRE_PRIORITY_IDLE_NPC		10
 #define FIRE_PRIORITY_SERVER_MAINT	10
+#define FIRE_PRIORITY_TICKETS		10
 #define FIRE_PRIORITY_RESEARCH		10
 #define FIRE_PRIORITY_GARBAGE		15
 #define FIRE_PRIORITY_WET_FLOORS	20
@@ -103,6 +113,7 @@
 #define FIRE_PRIORITY_MOBS			100
 #define FIRE_PRIORITY_NANOUI		110
 #define FIRE_PRIORITY_TICKER		200
+#define FIRE_PRIORITY_CHAT			400
 #define FIRE_PRIORITY_OVERLAYS		500
 #define FIRE_PRIORITY_INPUT			1000 // This must always always be the max highest priority. Player input must never be lost.
 
@@ -116,3 +127,22 @@
 #define RUNLEVEL_POSTGAME 8
 
 #define RUNLEVELS_DEFAULT (RUNLEVEL_SETUP | RUNLEVEL_GAME | RUNLEVEL_POSTGAME)
+
+#define COMPILE_OVERLAYS(A)\
+	if (TRUE) {\
+		var/list/ad = A.add_overlays;\
+		var/list/rm = A.remove_overlays;\
+		var/list/po = A.priority_overlays;\
+		if(LAZYLEN(rm)){\
+			A.overlays -= rm;\
+			rm.Cut();\
+		}\
+		if(LAZYLEN(ad)){\
+			A.overlays |= ad;\
+			ad.Cut();\
+		}\
+		if(LAZYLEN(po)){\
+			A.overlays |= po;\
+		}\
+		A.flags_2 &= ~OVERLAY_QUEUED_2;\
+}

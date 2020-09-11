@@ -8,6 +8,9 @@
 	var/obj/item/stock_parts/cell/battery = null
 	device_type = MC_CELL
 
+/obj/item/computer_hardware/battery/get_cell()
+	return battery
+
 /obj/item/computer_hardware/battery/New(loc, battery_type = null)
 	if(battery_type)
 		battery = new battery_type(src)
@@ -64,7 +67,6 @@
 				holder.shutdown_computer()
 
 		return TRUE
-	return FALSE
 
 
 // Stock parts
